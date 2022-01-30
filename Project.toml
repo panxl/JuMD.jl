@@ -3,6 +3,11 @@ uuid = "3119199d-0ae6-4920-b993-62ed06888615"
 authors = ["Xiaoliang Pan <panxl@ou.edu> and contributors"]
 version = "0.1.0"
 
+[deps]
+LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
+PyCall = "438e738f-606a-5dbb-bf0a-cddfbfd45ab0"
+StaticArrays = "90137ffa-7385-5640-81b9-e52037218182"
+
 [compat]
 julia = "1.7"
 
