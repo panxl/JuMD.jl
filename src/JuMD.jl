@@ -1,5 +1,6 @@
 module JuMD
 
+using LinearAlgebra
 using StaticArrays
 
 include("constants.jl")
