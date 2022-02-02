@@ -1,5 +1,9 @@
 abstract type AbstractThermostat end
 
+struct NullThermostat <: AbstractThermostat end
+
+function (::NullThermostat)(system::AbstractSystem, dt) end
+
 struct LangevinThermostat <: AbstractThermostat
     gamma::Float64
     T::Float64
