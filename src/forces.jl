@@ -102,25 +102,146 @@ end
 function periodic_torsion_force(x1, x2, x3, x4, n, ϕ₀, k)
     v1 = x2 - x1
     v2 = x2 - x3
-    v2 /= norm(v2)
     v3 = x4 - x3
+
+    r₂² = v2 ⋅ v2
+    r₂ = sqrt(r₂²)
     cp1 = v1 × v2
     cp2 = v2 × v3
-    m1 = cp1 × v2
     x = cp1 ⋅ cp2
-    y = m1 ⋅ cp2
+    y = (cp1 × cp2) ⋅ v2 / r₂
     ϕ = atan(y, x)
 
     Δϕ = n * ϕ - ϕ₀
     dEdϕ = -k * n * sin(Δϕ)
 
-    f1 = -dEdϕ / (cp1 ⋅ cp1) * cp1
-    f4 = dEdϕ / (cp2 ⋅ cp2) * cp2
+    f1 =  dEdϕ * r₂ / (cp1 ⋅ cp1) * cp1
+    f4 = -dEdϕ * r₂ / (cp2 ⋅ cp2) * cp2
 
-    s = (v1 ⋅ v2) * f1 - (v3 ⋅ v2) * f4
-    f2 = s - f1
+    s = (v1 ⋅ v2) / r₂² * f1 - (v3 ⋅ v2) / r₂² * f4
+    f2 =  s - f1
     f3 = -s - f4
 
     e = k * (1.0 + cos(Δϕ))
     return (f1, f2, f3, f4), e
+end
+
+struct LennardJonesForce <: AbstractForce
+    sigma::Vector{Float64}
+    epsilon::Vector{Float64}
+    exlusion::Vector{Set{Int}}
+end
+
+function force!(system::AbstractSystem, f::LennardJonesForce)
+    natoms = length(f.epsilon)
+    e_sum = 0.0
+    for i1 in 1:natoms-1
+        for i2 in i1+1:natoms
+            if !(i2 in f.exlusion[i1])
+                x1 = position(system)[i1]
+                x2 = position(system)[i2]
+                σ₁ = f.sigma[i1]
+                σ₂ = f.sigma[i2]
+                ϵ₁ = f.epsilon[i1]
+                ϵ₂ = f.epsilon[i2]
+
+                σ = σ₁ + σ₂
+                ϵ = ϵ₁ * ϵ₂
+
+                (f1, f2), e = lennard_jones_force(x1, x2, σ, ϵ)
+                force(system)[i1] += f1
+                force(system)[i2] += f2
+                e_sum += e
+            end
+        end
+    end
+    return e_sum
+end
+
+struct LennardJonesExceptionForce <: AbstractForce
+    indices::Tuple{Int, Int}
+    sigma::Float64
+    epsilon::Float64
+end
+
+function force!(system::AbstractSystem, f::LennardJonesExceptionForce)
+    i1, i2 = f.indices
+    x1 = position(system)[i1]
+    x2 = position(system)[i2]
+    σ = f.sigma
+    ϵ = f.epsilon
+
+    (f1, f2), e = lennard_jones_force(x1, x2, σ, ϵ)
+    force(system)[i1] += f1
+    force(system)[i2] += f2
+
+    return e
+end
+
+function lennard_jones_force(x1, x2, σ, ϵ)
+    v = x2 - x1
+    r = norm(v)
+
+    σ⁶ = (σ / r)^6
+
+    f1 = -ϵ * σ⁶ * (12 * σ⁶ - 6.0) / (r * r) * v
+    f2 = -f1
+    e = ϵ * σ⁶ * (σ⁶ - 1.0)
+    return (f1, f2), e
+end
+
+struct CoulombForce <: AbstractForce
+    charge::Vector{Float64}
+    exlusion::Vector{Set{Int}}
+end
+
+function force!(system::AbstractSystem, f::CoulombForce)
+    natoms = length(f.charge)
+    e_sum = 0.0
+    for i1 in 1:natoms-1
+        for i2 in i1+1:natoms
+            if !(i2 in f.exlusion[i1])
+                x1 = position(system)[i1]
+                x2 = position(system)[i2]
+                q₁ = f.charge[i1]
+                q₂ = f.charge[i2]
+
+                (f1, f2), e = coulomb_force(x1, x2, q₁, q₂, KE)
+                force(system)[i1] += f1
+                force(system)[i2] += f2
+                e_sum += e
+            end
+        end
+    end
+    return e_sum
+end
+
+struct CoulombExceptionForce <: AbstractForce
+    indices::Tuple{Int, Int}
+    charges::Tuple{Float64, Float64}
+    scaling::Float64
+end
+
+function force!(system::AbstractSystem, f::CoulombExceptionForce)
+    i1, i2 = f.indices
+    x1 = position(system)[i1]
+    x2 = position(system)[i2]
+    q₁, q₂ = f.charges
+
+    (f1, f2), e = coulomb_force(x1, x2, q₁, q₂, f.scaling * KE)
+    force(system)[i1] += f1
+    force(system)[i2] += f2
+
+    return e
+end
+
+function coulomb_force(x1, x2, q₁, q₂, scaling)
+    v = x2 - x1
+    r = norm(v)
+    e = scaling * q₁ * q₂ / r
+
+    f1 = -e / (r * r) * v
+    f2 = -f1
+
+    return (f1, f2), e
 end
