@@ -180,11 +180,13 @@ end
 
 function lennard_jones_force(x1, x2, σ, ϵ)
     v = x2 - x1
-    r = norm(v)
+    r² = v ⋅ v
+    r = sqrt(r²)
 
-    σ⁶ = (σ / r)^6
+    σ² = (σ / r)^2
+    σ⁶ = σ² * σ² * σ²
 
-    f1 = -ϵ * σ⁶ * (12 * σ⁶ - 6.0) / (r * r) * v
+    f1 = -ϵ * σ⁶ * (12 * σ⁶ - 6.0) / r² * v
     f2 = -f1
     e = ϵ * σ⁶ * (σ⁶ - 1.0)
     return (f1, f2), e
@@ -237,10 +239,11 @@ end
 
 function coulomb_force(x1, x2, q₁, q₂, scaling)
     v = x2 - x1
-    r = norm(v)
+    r² = v ⋅ v
+    r = sqrt(r²)
     e = scaling * q₁ * q₂ / r
 
-    f1 = -e / (r * r) * v
+    f1 = -e / r² * v
     f2 = -f1
 
     return (f1, f2), e
