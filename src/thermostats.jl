@@ -12,7 +12,7 @@ end
 function (thermostat::LangevinThermostat)(system::AbstractSystem, dt)
     kT = KB * thermostat.T
     v = velocity(system)
-    inv_M = mass(system)
+    inv_M = inverse_mass(system)
     langevin_thermostat(v, inv_M, dt, thermostat.gamma, kT)
 end
 
@@ -20,7 +20,7 @@ function langevin_thermostat(v, inv_M, dt, gamma, kT)
     c1 = exp(-gamma * dt)
     c2 = sqrt(1 - c1^2)
     @inbounds for i in eachindex(v)
-        v[i] = c1 .* v[i] .+ c2 * sqrt(kT * inv_M[i]) .* randn(eltype(v))
+        v[i] = c1 * v[i] + c2 * sqrt(kT * inv_M[i]) * randn(eltype(v))
     end
     return nothing
 end

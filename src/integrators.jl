@@ -11,7 +11,7 @@ function (integrator::VerlocityVerletIntegrator)(system::AbstractSystem)
     v = velocity(system)
     F = force(system)
     inv_M = inverse_mass(system)
-    halfdt = integrator.dt / 2
+    halfdt = integrator.dt * 20.455 / 2
 
     @. v = v + F * inv_M * halfdt
     integrator.constraint(system)
