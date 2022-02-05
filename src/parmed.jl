@@ -4,7 +4,7 @@ function MMSystem(parm7::AbstractString, rst7::AbstractString)
     amb = pyimport("parmed.amber")
     parm = amb.AmberParm(parm7, rst7)
 
-    positions = Vector{SVector{3, Float64}}(parm.positions._value)
+    positions = [SVector(x._value ./ 10.0) for x in parm.positions]
     velocities = similar(positions)
     fill!(velocities, zeros(eltype(velocities)))
     forces = similar(positions)
@@ -15,28 +15,28 @@ function MMSystem(parm7::AbstractString, rst7::AbstractString)
 
     force_group_bonds = ForceGroup(HarmonicBondForce[])
     for bond in parm.bonds
-        push!(force_group_bonds.forces, HarmonicBondForce((bond.atom1.idx+1, bond.atom2.idx+1), bond.type.req, bond.type.k*2))
+        push!(force_group_bonds.forces, HarmonicBondForce((bond.atom1.idx+1, bond.atom2.idx+1), bond.type.req/10.0, bond.type.k*2*4.184*100))
         push!(nonbonded_exslusion[bond.atom1.idx+1], bond.atom2.idx+1)
         push!(nonbonded_exslusion[bond.atom2.idx+1], bond.atom1.idx+1)
     end
 
     force_group_angles = ForceGroup(HarmonicAngleForce[])
     for angle in parm.angles
-        push!(force_group_angles.forces, HarmonicAngleForce((angle.atom1.idx+1, angle.atom2.idx+1, angle.atom3.idx+1), angle.type.theteq/180.0*pi, angle.type.k*2))
+        push!(force_group_angles.forces, HarmonicAngleForce((angle.atom1.idx+1, angle.atom2.idx+1, angle.atom3.idx+1), angle.type.theteq/180.0*pi, angle.type.k*4.184*2))
         push!(nonbonded_exslusion[angle.atom1.idx+1], angle.atom3.idx+1)
         push!(nonbonded_exslusion[angle.atom3.idx+1], angle.atom1.idx+1)
     end
 
     force_group_dihedrals = ForceGroup(PeriodicTorsionForce[])
     for dihedral in parm.dihedrals
-        push!(force_group_dihedrals.forces, PeriodicTorsionForce((dihedral.atom1.idx+1, dihedral.atom2.idx+1, dihedral.atom3.idx+1, dihedral.atom4.idx+1), dihedral.type.per, dihedral.type.phase/180.0*pi, dihedral.type.phi_k))
+        push!(force_group_dihedrals.forces, PeriodicTorsionForce((dihedral.atom1.idx+1, dihedral.atom2.idx+1, dihedral.atom3.idx+1, dihedral.atom4.idx+1), dihedral.type.per, dihedral.type.phase/180.0*pi, dihedral.type.phi_k*4.184))
         if !dihedral.improper
             push!(nonbonded_exslusion[dihedral.atom1.idx+1], dihedral.atom4.idx+1)
             push!(nonbonded_exslusion[dihedral.atom4.idx+1], dihedral.atom1.idx+1)
         end
     end
 
-    vdw_force = LennardJonesForce([atom.sigma/2 for atom in parm.atoms], [2*sqrt(atom.epsilon) for atom in parm.atoms], nonbonded_exslusion)
+    vdw_force = LennardJonesForce([atom.sigma/10.0/2 for atom in parm.atoms], [2*sqrt(atom.epsilon*4.184) for atom in parm.atoms], nonbonded_exslusion)
     force_group_vdw = ForceGroup(LennardJonesForce[vdw_force])    
 
     vdw14_force = Set{LennardJonesExceptionForce}()
@@ -50,7 +50,7 @@ function MMSystem(parm7::AbstractString, rst7::AbstractString)
             epsilon2 = parm.atoms[index2].epsilon
             sigma = (sigma1 + sigma2) / 2
             epsilon = 4 * sqrt(epsilon1 * epsilon2) / dihedral.type.scnb
-            push!(vdw14_force, LennardJonesExceptionForce((index1, index2), sigma, epsilon))
+            push!(vdw14_force, LennardJonesExceptionForce((index1, index2), sigma/10.0, epsilon*4.184))
         end
     end
     force_group_vdw14 = ForceGroup(collect(vdw14_force))

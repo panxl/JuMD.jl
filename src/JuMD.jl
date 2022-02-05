@@ -2,6 +2,7 @@ module JuMD
 
 using LinearAlgebra
 using StaticArrays
+using Unitful
 
 include("constants.jl")
 include("caches.jl")

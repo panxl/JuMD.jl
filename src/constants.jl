@@ -1,5 +1,4 @@
-const J_PER_CAL = 4.184                  # This is defined as the thermochemical calorie
-const JPKC = J_PER_CAL * 1000.0          # kilocalories per joule
-const BOLTZMANN = 1.380658e-23           # Boltzmann's constant in J/K
-const AVOGADRO = 6.0221367e+23           # Avogadro's number
-const KB = (BOLTZMANN * AVOGADRO) / JPKC # Boltzmann's constant in internal units
+import PhysicalConstants.CODATA2018: k_B, N_A, ε_0
+
+const KB = ustrip(uconvert(u"kJ/mol/K", k_B * N_A))
+const KE = ustrip(uconvert(u"kJ*nm", 1 / (4 * pi * uconvert(u"C^2*N^-1*m^−2", ε_0) / u"q^2")) * N_A)

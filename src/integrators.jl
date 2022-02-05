@@ -13,7 +13,7 @@ function (integrator::VerlocityVerletIntegrator)(system::AbstractSystem)
     v_half = velocity_half(system)
     F = force(system)
     inv_M = inverse_mass(system)
-    halfdt = integrator.dt * 20.455 / 2
+    halfdt = integrator.dt / 2
 
     @. v = v + F * inv_M * halfdt
     integrator.constraint(system)
@@ -30,7 +30,7 @@ function (integrator::VerlocityVerletIntegrator)(system::AbstractSystem)
     if integrator.thermostat isa GJFThermostat
         dt = integrator.dt
         γ = integrator.thermostat.gamma
-        @. v_half = sqrt(1 + 0.5 * γ * dt) / (dt * 20.455) * (x - x_last)
+        @. v_half = sqrt(1 + 0.5 * γ * dt) / dt * (x - x_last)
     else
         v_half .= v
     end
