@@ -126,18 +126,20 @@ function periodic_torsion_force(x1, x2, x3, x4, n, ϕ₀, k)
     return (f1, f2, f3, f4), e
 end
 
-struct LennardJonesForce <: AbstractForce
+struct LennardJonesForce{E<:Union{Vector{Set{Int}},Nothing}} <: AbstractForce
     sigma::Vector{Float64}
     epsilon::Vector{Float64}
-    exlusion::Vector{Set{Int}}
+    exlusion::E
 end
+
+LennardJonesForce(sigma, epsilon) = LennardJonesForce(sigma, epsilon, nothing)
 
 function force!(system::AbstractSystem, f::LennardJonesForce)
     natoms = length(f.epsilon)
     e_sum = 0.0
     for i1 in 1:natoms-1
         for i2 in i1+1:natoms
-            if !(i2 in f.exlusion[i1])
+            if isnothing(f.exlusion) || i2 ∉ f.exlusion[i1]
                 x1 = position(system)[i1]
                 x2 = position(system)[i2]
                 σ₁ = f.sigma[i1]
@@ -192,17 +194,19 @@ function lennard_jones_force(x1, x2, σ, ϵ)
     return (f1, f2), e
 end
 
-struct CoulombForce <: AbstractForce
+struct CoulombForce{E<:Union{Vector{Set{Int}},Nothing}} <: AbstractForce
     charge::Vector{Float64}
-    exlusion::Vector{Set{Int}}
+    exlusion::E
 end
+
+CoulombForce(charge) = CoulombForce(charge, nothing)
 
 function force!(system::AbstractSystem, f::CoulombForce)
     natoms = length(f.charge)
     e_sum = 0.0
     for i1 in 1:natoms-1
         for i2 in i1+1:natoms
-            if !(i2 in f.exlusion[i1])
+            if isnothing(f.exlusion) || i2 ∉ f.exlusion[i1]
                 x1 = position(system)[i1]
                 x2 = position(system)[i2]
                 q₁ = f.charge[i1]
