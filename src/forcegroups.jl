@@ -1,10 +1,9 @@
-struct ForceGroup{F<:AbstractForce, N<:Union{Float64,Vector{Float64}}}
-    forces::Vector{F}
+struct ForceGroup{F<:Union{<:AbstractForce, Vector{<:AbstractForce}}, N<:Union{Float64, Vector{Float64}}}
+    forces::F
     scaling_factors::N
 end
 
 ForceGroup(forces) = ForceGroup(forces, 1.0)
-ForceGroup(F::Type) = ForceGroup(Vector{F}())
 
 struct ForceGroups{K, V}
     groups::NamedTuple{K, V}

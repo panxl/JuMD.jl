@@ -30,11 +30,16 @@ inverse_mass!(s::AbstractSystem) = hasproperty(s.scache, :inverse_masses) ? s.sc
 velocity_half(s::AbstractSystem) = !hasproperty(s.vcache, :velocities_half) ? s.vcache.velocities_half = similar(s.velocities) : s.vcache.velocities_half
 position_last(s::AbstractSystem) = !hasproperty(s.vcache, :positions_last) ? s.vcache.positions_last = similar(s.positions) : s.vcache.positions_last
 
-function force!(s::AbstractSystem, force_group::ForceGroup{<:AbstractForce})
+function force!(s::AbstractSystem, force_group::ForceGroup{Vector{<:AbstractForce}})
     e = 0.0
     for f in force_group.forces
         e += force!(s, f)
     end
+    return e
+end
+
+function force!(s::AbstractSystem, force_group::ForceGroup{<:AbstractForce})
+    e = force!(s, force_group.forces)
     return e
 end
 

@@ -37,7 +37,7 @@ function MMSystem(parm7::AbstractString, rst7::AbstractString)
     end
 
     vdw_force = LennardJonesForce([atom.sigma/10.0/2 for atom in parm.atoms], [2*sqrt(atom.epsilon*4.184) for atom in parm.atoms], nonbonded_exslusion)
-    force_group_vdw = ForceGroup([vdw_force])
+    force_group_vdw = ForceGroup(vdw_force)
 
     vdw14_force = Set{LennardJonesExceptionForce}()
     for dihedral in parm.dihedrals
@@ -56,7 +56,7 @@ function MMSystem(parm7::AbstractString, rst7::AbstractString)
     force_group_vdw14 = ForceGroup(collect(vdw14_force))
 
     elec_force = CoulombForce([atom.charge for atom in parm.atoms], nonbonded_exslusion)
-    force_group_elec = ForceGroup([elec_force])
+    force_group_elec = ForceGroup(elec_force)
 
     elec14_force = Set{CoulombExceptionForce}()
     for dihedral in parm.dihedrals
