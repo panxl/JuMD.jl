@@ -1,12 +1,16 @@
 module JuMD
 
 using LinearAlgebra
+using OffsetArrays
+using PeriodicTable
 using StaticArrays
 using Unitful
 
 include("constants.jl")
 include("caches.jl")
+include("cell_list.jl")
 include("forces.jl")
+include("switching.jl")
 include("forcegroups.jl")
 include("systems.jl")
 include("thermostats.jl")

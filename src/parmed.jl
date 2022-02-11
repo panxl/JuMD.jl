@@ -4,11 +4,15 @@ function MMSystem(parm7::AbstractString, rst7::AbstractString)
     amb = pyimport("parmed.amber")
     parm = amb.AmberParm(parm7, rst7)
 
+    if isnothing(parm.box)
+        box = [0., 0., 0.]
+    elseif parm.box[4:6] != [90., 90., 90.]
+        error("Only orthogonal box is supported")
+    else
+        box = parm.box[1:3]
+    end
+
     positions = [SVector(x._value ./ 10.0) for x in parm.positions]
-    velocities = similar(positions)
-    fill!(velocities, zeros(eltype(velocities)))
-    forces = similar(positions)
-    fill!(forces, zeros(eltype(forces)))
     masses = [atom.mass for atom in parm.atoms]
     atomic_numbers = [atom.atomic_number for atom in parm.atoms]
     nonbonded_exslusion = [Set{Int}() for _ in parm.atoms]
@@ -72,5 +76,5 @@ function MMSystem(parm7::AbstractString, rst7::AbstractString)
 
     force_groups = ForceGroups((bonds=force_group_bonds, angles=force_group_angles, dihedrals=force_group_dihedrals, vdw=force_group_vdw, vdw14=force_group_vdw14, elec=force_group_elec, elec14=force_group_elec14))
 
-    MMSystem(positions, velocities, forces, masses, atomic_numbers, force_groups)
+    MMSystem(box, positions, masses, atomic_numbers, force_groups)
 end

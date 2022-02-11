@@ -1,36 +1,50 @@
-struct MMSystem{D, K, V} <:AbstractSystem{D}
+struct MMSystem{D, C, N, K, V} <:AbstractSystem{D}
+    box::SVector{D, Float64}
     positions::Vector{SVector{D, Float64}}
     velocities::Vector{SVector{D, Float64}}
-    forces::Vector{SVector{D, Float64}}
+    forces::NTuple{N, Vector{SVector{D, Float64}}}
     masses::Vector{Float64}
     atomic_numbers::Vector{Int}
     force_groups::ForceGroups{K, V}
+    cell_list::C
     scache::Cache{Float64}
     vcache::Cache{SVector{D, Float64}}
 end
 
-function MMSystem(positions::AbstractVector{SVector{D, F}},
-                velocities::AbstractVector{SVector{D, F}},
-                forces::AbstractVector{SVector{D, F}},
-                masses::AbstractVector{F},
-                atomic_numbers::AbstractVector{I},
-                force_groups::ForceGroups{K,V}) where {D, F<:AbstractFloat, I<:Integer, K, V}
-    MMSystem{D, K, V}(positions, velocities, forces, masses, atomic_numbers, force_groups, Cache(Float64), Cache(SVector{D, Float64}))
+function MMSystem(box,
+                  positions::AbstractVector{SVector{D, F}},
+                  masses::AbstractVector{F},
+                  atomic_numbers::AbstractVector{I},
+                  force_groups::ForceGroups{K,V};
+                  cutoff=nothing) where {D, F<:AbstractFloat, I<:Integer, K, V}
+    N = Threads.nthreads()
+    velocities = zero(positions)
+    forces = ntuple(i -> zero(positions), N)
+
+    if isnothing(cutoff)
+        cell_list = NullCellList()
+    else
+        cell_list = LinkedCellList(length(positions), float(cutoff), box)
+    end
+    C = typeof(cell_list)
+
+    MMSystem{D, C, N, K, V}(box, positions, velocities, forces, masses, atomic_numbers, force_groups, cell_list, Cache(Float64), Cache(SVector{D, Float64}))
 end
 
 position(s::AbstractSystem)      = s.positions
 velocity(s::AbstractSystem)      = s.velocities
-force(s::AbstractSystem)         = s.forces
+force(s::AbstractSystem)         = s.forces[1]
+force(s::AbstractSystem, i::Integer) = s.forces[i]
 atomic_number(s::AbstractSystem) = s.atomic_numbers
 mass(s::AbstractSystem)          = s.masses
 
-inverse_mass(s::AbstractSystem) = !hasproperty(s.scache, :inverse_masses) ? s.scache.inverse_masses = 1 ./ s.masses : s.scache.inverse_masses
+inverse_mass(s::AbstractSystem)  = !hasproperty(s.scache, :inverse_masses) ? s.scache.inverse_masses = 1 ./ s.masses : s.scache.inverse_masses
 inverse_mass!(s::AbstractSystem) = hasproperty(s.scache, :inverse_masses) ? s.scache.inverse_masses .= 1 ./ s.masses : s.scache.inverse_masses = 1 ./ s.masses
 
 velocity_half(s::AbstractSystem) = !hasproperty(s.vcache, :velocities_half) ? s.vcache.velocities_half = similar(s.velocities) : s.vcache.velocities_half
 position_last(s::AbstractSystem) = !hasproperty(s.vcache, :positions_last) ? s.vcache.positions_last = similar(s.positions) : s.vcache.positions_last
 
-function force!(s::AbstractSystem, force_group::ForceGroup{Vector{<:AbstractForce}})
+function force!(s::AbstractSystem, force_group::ForceGroup{<:Vector{<:AbstractForce}})
     e = 0.0
     for f in force_group.forces
         e += force!(s, f)
@@ -39,13 +53,22 @@ function force!(s::AbstractSystem, force_group::ForceGroup{Vector{<:AbstractForc
 end
 
 function force!(s::AbstractSystem, force_group::ForceGroup{<:AbstractForce})
-    e = force!(s, force_group.forces)
+    e = force!(s, force_group.forces, s.cell_list)
     return e
 end
 
 function force!(s::AbstractSystem, force_groups::ForceGroups)
-    fill!(s.forces, zeros(eltype(s.forces)))
+    for i in 1:Threads.nthreads()
+        forces = force(s, i)
+        fill!(forces, zeros(eltype(forces)))
+    end
+    update!(s.cell_list, s.positions, s.box)
     force_groups.energies .= map(fg::ForceGroup -> force!(s, fg), values(force_groups.groups))
+    for i in 2:Threads.nthreads()
+        forces = force(s, i)
+        force(s) .+= forces
+        fill!(forces, zeros(eltype(forces)))
+    end
     return nothing
 end
 
