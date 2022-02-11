@@ -23,3 +23,15 @@ function Base.run(sim::AbstractSimulation, steps::Integer)
         close.(files)
     end
 end
+
+function minimize!(system::AbstractSystem, steps, stepsize=0.001)
+    positions = position(system)
+    forces = force(system)
+
+    for _ in 1:steps
+        force!(system)
+        for i in eachindex(positions, forces)
+            positions[i] += stepsize * clamp.(forces[i], -1, 1)
+        end
+    end
+end
