@@ -44,7 +44,7 @@ function (reporter::XYZTrajectoryReporter)(io::IO, system::AbstractSystem, curre
         atomic_numbers = atomic_number(system)
         println(io, length(positions), "\n")
         for (n, x) in zip(atomic_numbers, positions)
-            println(io, n, " ", x[1], " ", x[2], " ", x[3])
+            println(io, n, " ", x[1]*10.0, " ", x[2]*10.0, " ", x[3]*10.0)
         end
     end
 end
