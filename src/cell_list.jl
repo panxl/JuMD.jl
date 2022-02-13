@@ -10,8 +10,8 @@ struct LinkedCellList{D} <: AbstractCellList
     cutoff::Float64
 end
 
-function LinkedCellList(natoms::Integer, cutoff, box::NTuple{D, <:AbstractFloat}) where {D}
-    N = Threads.nthreads()
+function LinkedCellList(natoms, cutoff, box)
+    D = length(box)
     cells = Vector{CartesianIndex{D}}(undef, natoms)
     list = Vector{Int}(undef, natoms)
     ncells = map(b -> floor(Int, b / cutoff), box)

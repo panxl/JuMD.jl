@@ -1,6 +1,6 @@
 using PyCall
 
-function MMSystem(parm7::AbstractString, rst7::AbstractString)
+function MMSystem(parm7::AbstractString, rst7::AbstractString; cutoff=nothing)
     amb = pyimport("parmed.amber")
     parm = amb.AmberParm(parm7, rst7)
 
@@ -76,5 +76,5 @@ function MMSystem(parm7::AbstractString, rst7::AbstractString)
 
     force_groups = ForceGroups((bonds=force_group_bonds, angles=force_group_angles, dihedrals=force_group_dihedrals, vdw=force_group_vdw, vdw14=force_group_vdw14, elec=force_group_elec, elec14=force_group_elec14))
 
-    MMSystem(box, positions, masses, atomic_numbers, force_groups)
+    MMSystem(box, positions, masses, atomic_numbers, force_groups, cutoff=cutoff)
 end
