@@ -9,15 +9,18 @@ struct HarmonicBondForce <: AbstractForce
 end
 
 function force!(system::AbstractSystem, f::HarmonicBondForce)
+    positions = position(system)
+    forces = force(system)
     i1, i2 = f.indices
-    x1 = position(system)[i1]
-    x2 = position(system)[i2]
+
+    x1 = positions[i1]
+    x2 = positions[i2]
     r₀= f.length
     k = f.k
 
     (f1, f2), e = harmonic_bond_force(x1, x2, r₀, k)
-    force(system)[i1] += f1
-    force(system)[i2] += f2
+    forces[i1] += f1
+    forces[i2] += f2
 
     return e
 end
@@ -39,17 +42,20 @@ struct HarmonicAngleForce <: AbstractForce
 end
 
 function force!(system::AbstractSystem, f::HarmonicAngleForce)
+    positions = position(system)
+    forces = force(system)
     i1, i2, i3 = f.indices
-    x1 = position(system)[i1]
-    x2 = position(system)[i2]
-    x3 = position(system)[i3]
+
+    x1 = positions[i1]
+    x2 = positions[i2]
+    x3 = positions[i3]
     θ₀= f.angle
     k = f.k
 
     (f1, f2, f3), e = harmonic_angle_force(x1, x2, x3, θ₀, k)
-    force(system)[i1] += f1
-    force(system)[i2] += f2
-    force(system)[i3] += f3
+    forces[i1] += f1
+    forces[i2] += f2
+    forces[i3] += f3
 
     return e
 end
@@ -81,20 +87,23 @@ struct PeriodicTorsionForce <: AbstractForce
 end
 
 function force!(system::AbstractSystem, f::PeriodicTorsionForce)
+    positions = position(system)
+    forces = force(system)
     i1, i2, i3, i4 = f.indices
-    x1 = position(system)[i1]
-    x2 = position(system)[i2]
-    x3 = position(system)[i3]
-    x4 = position(system)[i4]
+
+    x1 = positions[i1]
+    x2 = positions[i2]
+    x3 = positions[i3]
+    x4 = positions[i4]
     n = f.periodicity
     ϕ₀ = f.phase
     k = f.k
 
     (f1, f2, f3, f4), e = periodic_torsion_force(x1, x2, x3, x4, n, ϕ₀, k)
-    force(system)[i1] += f1
-    force(system)[i2] += f2
-    force(system)[i3] += f3
-    force(system)[i4] += f4
+    forces[i1] += f1
+    forces[i2] += f2
+    forces[i3] += f3
+    forces[i4] += f4
 
     return e
 end
@@ -136,26 +145,42 @@ LennardJonesForce(sigma, epsilon) = LennardJonesForce(sigma, epsilon, nothing)
 
 function force!(system::AbstractSystem, f::LennardJonesForce, cl::NullCellList)
     natoms = length(f.epsilon)
+    positions = position(system)
+    forces = force(system)
     e_sum = 0.0
-    for i1 in 1:natoms-1
-        for i2 in i1+1:natoms
-            if isnothing(f.exlusion) || i2 ∉ f.exlusion[i1]
-                x1 = position(system)[i1]
-                x2 = position(system)[i2]
-                v = x2 - x1
-                σ₁ = f.sigma[i1]
-                σ₂ = f.sigma[i2]
-                ϵ₁ = f.epsilon[i1]
-                ϵ₂ = f.epsilon[i2]
 
-                σ = σ₁ + σ₂
-                ϵ = ϵ₁ * ϵ₂
+    for i in 1 : (natoms - 1)
+        # skip to next i-atom if i-atom's epsilon is zero
+        if f.epsilon[i] == 0.0
+            continue
+        end
 
-                (f1, f2), e = lennard_jones_force(v, σ, ϵ)
-                force(system)[i1] += f1
-                force(system)[i2] += f2
-                e_sum += e
+        for j in (i + 1 : natoms)
+            # skip to next j-atom if j-atom's epsilon is zero
+            if f.epsilon[j] == 0.0
+                continue
             end
+
+            # skip if j-atom is in i-atom's exlusion list
+            if !isnothing(f.exlusion) && j ∈ f.exlusion[i]
+                continue
+            end
+
+            x1 = positions[i]
+            x2 = positions[j]
+            v = x2 - x1
+            σ₁ = f.sigma[i]
+            σ₂ = f.sigma[j]
+            ϵ₁ = f.epsilon[i]
+            ϵ₂ = f.epsilon[j]
+
+            σ = σ₁ + σ₂
+            ϵ = ϵ₁ * ϵ₂
+
+            (f1, f2), e = lennard_jones_force(v, σ, ϵ)
+            forces[i] += f1
+            forces[j] += f2
+            e_sum += e
         end
     end
     return e_sum
@@ -173,6 +198,12 @@ function force!(system::AbstractSystem, f::LennardJonesForce, cl::LinkedCellList
         forces = force(system, Threads.threadid())
 
         while i != 0
+            # skip to next i-atom if i-atom's epsilon is zero
+            if f.epsilon[i] == 0.0
+                i = cl.list[i]
+                continue
+            end
+
             for offset in cl.offsets
                 if offset == last(cl.offsets)
                     j = cl.list[i]
@@ -183,8 +214,16 @@ function force!(system::AbstractSystem, f::LennardJonesForce, cl::LinkedCellList
                 end
 
                 while j != 0
+                    # skip to next j-atom if j-atom's epsilon is zero
+                    if f.epsilon[j] == 0.0
+                        j = cl.list[j]
+                        continue
+                    end
+
+                    # skip if j-atom is in i-atom's exlusion list
                     if !isnothing(f.exlusion) && j ∈ f.exlusion[i]
-                        break
+                        j = cl.list[j]
+                        continue
                     end
 
                     x1 = positions[i]
@@ -196,35 +235,44 @@ function force!(system::AbstractSystem, f::LennardJonesForce, cl::LinkedCellList
                         v = minimum_image(v ./ system.box) .* system.box
                     end
 
+                    # skip to next j-atom if r > rcut
                     r² = v ⋅ v
-                    if r² < rcut²
-                        σ₁ = f.sigma[i]
-                        σ₂ = f.sigma[j]
-                        ϵ₁ = f.epsilon[i]
-                        ϵ₂ = f.epsilon[j]
-
-                        σ = σ₁ + σ₂
-                        ϵ = ϵ₁ * ϵ₂
-
-                        (f1, f2), e = lennard_jones_force(v, σ, ϵ)
-
-                        # apply switching function
-                        r = sqrt(r²)
-                        s, dsdr = shift(r, rcut)
-                        f1 = f1 .* s + e * dsdr / r * v
-                        f2 = f2 .* s - e * dsdr / r * v
-                        e *= s
-
-                        forces[i] += f1
-                        forces[j] += f2
-                        e_threads[Threads.threadid()] += e
+                    if r² > rcut²
+                        j = cl.list[j]
+                        continue
                     end
-                    j = cl.list[j] # Next j-atom
+
+                    σ₁ = f.sigma[i]
+                    σ₂ = f.sigma[j]
+                    ϵ₁ = f.epsilon[i]
+                    ϵ₂ = f.epsilon[j]
+
+                    σ = σ₁ + σ₂
+                    ϵ = ϵ₁ * ϵ₂
+
+                    (f1, f2), e = lennard_jones_force(v, σ, ϵ)
+
+                    # apply switching function
+                    r = sqrt(r²)
+                    s, dsdr = shift(r, rcut)
+                    f1 = f1 .* s + e * dsdr / r * v
+                    f2 = f2 .* s - e * dsdr / r * v
+                    e *= s
+
+                    forces[i] += f1
+                    forces[j] += f2
+                    e_threads[Threads.threadid()] += e
+
+                    # Next j-atom
+                    j = cl.list[j]
                 end
             end
-            i = cl.list[i] # Next i-atom
+
+             # Next i-atom
+            i = cl.list[i]
         end
     end # End loop over all cells
+
     e_sum = sum(e_threads)
     return e_sum
 end
@@ -236,9 +284,12 @@ struct LennardJonesExceptionForce <: AbstractForce
 end
 
 function force!(system::AbstractSystem, f::LennardJonesExceptionForce)
+    positions = position(system)
+    forces = force(system)
     i1, i2 = f.indices
-    x1 = position(system)[i1]
-    x2 = position(system)[i2]
+
+    x1 = positions[i1]
+    x2 = positions[i2]
     v = x2 - x1
     σ = f.sigma
     ϵ = f.epsilon
@@ -249,8 +300,8 @@ function force!(system::AbstractSystem, f::LennardJonesExceptionForce)
     end
 
     (f1, f2), e = lennard_jones_force(v, σ, ϵ)
-    force(system)[i1] += f1
-    force(system)[i2] += f2
+    forces[i1] += f1
+    forces[i2] += f2
 
     return e
 end
@@ -282,23 +333,125 @@ CoulombForce(charge) = CoulombForce(charge, nothing)
 
 function force!(system::AbstractSystem, f::CoulombForce, cl::NullCellList)
     natoms = length(f.charge)
+    positions = position(system)
+    forces = force(system)
     e_sum = 0.0
-    for i1 in 1:natoms-1
-        for i2 in i1+1:natoms
-            if isnothing(f.exlusion) || i2 ∉ f.exlusion[i1]
-                x1 = position(system)[i1]
-                x2 = position(system)[i2]
-                v = x2 - x1
-                q₁ = f.charge[i1]
-                q₂ = f.charge[i2]
 
-                (f1, f2), e = coulomb_force(v, q₁, q₂, KE)
-                force(system)[i1] += f1
-                force(system)[i2] += f2
-                e_sum += e
+    for i in 1 : (natoms - 1)
+        # skip to next i-atom if i-atom's charge is zero
+        if f.charge[i] == 0.0
+            continue
+        end
+
+        for j in (i + 1) : natoms
+            # skip to next j-atom if j-atom's charge is zero
+            if f.charge[j] == 0.0
+                continue
             end
+
+            # skip if j-atom is in i-atom's exlusion list
+            if !isnothing(f.exlusion) && j ∈ f.exlusion[i]
+                continue
+            end
+
+            x1 = positions[i]
+            x2 = positions[j]
+            v = x2 - x1
+            q₁ = f.charge[i]
+            q₂ = f.charge[j]
+
+            (f1, f2), e = coulomb_force(v, q₁, q₂, KE)
+            forces[i] += f1
+            forces[j] += f2
+            e_sum += e
         end
     end
+    return e_sum
+end
+
+function force!(system::AbstractSystem, f::CoulombForce, cl::LinkedCellList)
+    positions = position(system)
+    ncells = size(cl.head)
+    rcut = cl.cutoff
+    rcut² = rcut^2
+    e_threads = zeros(Threads.nthreads())
+
+    Threads.@threads for ci in CartesianIndices(cl.head)
+        i = cl.head[ci]
+        forces = force(system, Threads.threadid())
+
+        while i != 0
+            # skip to next i-atom if i-atom's charge is zero
+            if f.charge[i] == 0.0
+                i = cl.list[i]
+                continue
+            end
+
+            for offset in cl.offsets
+                if offset == last(cl.offsets)
+                    j = cl.list[i]
+                else
+                    cj = Tuple(ci + offset)
+                    cj = mod.(cj, ncells)
+                    j = cl.head[CartesianIndex(cj)]
+                end
+
+                while j != 0
+                    # skip to next j-atom if j-atom's charge is zero
+                    if f.charge[j] == 0.0
+                        j = cl.list[j]
+                        continue
+                    end
+
+                    # skip if j-atom is in i-atom's exlusion list
+                    if !isnothing(f.exlusion) && j ∈ f.exlusion[i]
+                        j = cl.list[j]
+                        continue
+                    end
+
+                    x1 = positions[i]
+                    x2 = positions[j]
+                    v = x2 - x1
+
+                    # apply minimum image convention
+                    if any(system.box .!= 0.0)
+                        v = minimum_image(v ./ system.box) .* system.box
+                    end
+
+                    # skip to next j-atom if r > rcut
+                    r² = v ⋅ v
+                    if r² > rcut²
+                        j = cl.list[j]
+                        continue
+                    end
+
+                    q₁ = f.charge[i]
+                    q₂ = f.charge[j]
+        
+                    (f1, f2), e = coulomb_force(v, q₁, q₂, KE)
+
+                    # apply switching function
+                    r = sqrt(r²)
+                    s, dsdr = shift(r, rcut)
+                    f1 = f1 .* s + e * dsdr / r * v
+                    f2 = f2 .* s - e * dsdr / r * v
+                    e *= s
+
+                    forces[i] += f1
+                    forces[j] += f2
+                    e_threads[Threads.threadid()] += e
+
+                    # Next j-atom
+                    j = cl.list[j]
+                end
+            end
+
+            # Next i-atom
+            i = cl.list[i]
+        end
+    end # End loop over all cells
+
+    e_sum = sum(e_threads)
     return e_sum
 end
 
@@ -309,9 +462,12 @@ struct CoulombExceptionForce <: AbstractForce
 end
 
 function force!(system::AbstractSystem, f::CoulombExceptionForce)
+    positions = position(system)
+    forces = force(system)
     i1, i2 = f.indices
-    x1 = position(system)[i1]
-    x2 = position(system)[i2]
+
+    x1 = positions[i1]
+    x2 = positions[i2]
     v = x2 - x1
     q₁, q₂ = f.charges
 
@@ -321,8 +477,8 @@ function force!(system::AbstractSystem, f::CoulombExceptionForce)
     end
 
     (f1, f2), e = coulomb_force(v, q₁, q₂, f.scaling * KE)
-    force(system)[i1] += f1
-    force(system)[i2] += f2
+    forces[i1] += f1
+    forces[i2] += f2
 
     return e
 end
