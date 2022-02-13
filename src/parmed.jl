@@ -9,7 +9,7 @@ function MMSystem(parm7::AbstractString, rst7::AbstractString; cutoff=nothing)
     elseif parm.box[4:6] != [90., 90., 90.]
         error("Only orthogonal box is supported")
     else
-        box = parm.box[1:3]
+        box = parm.box[1:3] / 10.0
     end
 
     positions = [SVector(x._value ./ 10.0) for x in parm.positions]
