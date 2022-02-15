@@ -189,7 +189,7 @@ end
 function force!(system::AbstractSystem, f::LennardJonesForce, cl::LinkedCellList)
     positions = position(system)
     ncells = size(cl.head)
-    rcut = cl.cutoff
+    rcut = system.cutoff
     rcut² = rcut^2
     e_threads = zeros(Threads.nthreads())
 
@@ -372,7 +372,7 @@ end
 function force!(system::AbstractSystem, f::CoulombForce, cl::LinkedCellList)
     positions = position(system)
     ncells = size(cl.head)
-    rcut = cl.cutoff
+    rcut = system.cutoff
     rcut² = rcut^2
     e_threads = zeros(Threads.nthreads())
 
