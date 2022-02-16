@@ -1,10 +1,11 @@
 const SQRTPI = sqrt(pi)
 
-struct Ewald{D}
+struct Ewald{D, N}
     alpha::Float64
     kvectors::Vector{NTuple{D, Int}}
     kfactors::Vector{Float64}
     eir::OffsetArray{ComplexF64, 3, Array{ComplexF64, 3}}
+    _qeir::NTuple{N, Vector{ComplexF64}}
 end
 
 function Ewald(alpha, natoms, kmax, box)
@@ -25,7 +26,8 @@ function Ewald(alpha, natoms, kmax, box)
     end
 
     eir = zeros(ComplexF64, 1:natoms, -kmax:kmax, 1:D)
-    Ewald(alpha, kvectors, kfactors, eir)
+    _qeir = ntuple(i -> zeros(ComplexF64, natoms), Threads.nthreads())
+    Ewald(alpha, kvectors, kfactors, eir, _qeir)
 end
 
 function update!(ewald::Ewald, r_box)

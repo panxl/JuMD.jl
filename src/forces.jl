@@ -517,14 +517,11 @@ function force!(system::AbstractSystem, f::CoulombForce, cl::LinkedCellList, ewa
                     # apply minimum image convention
                     v = minimum_image(v ./ system.box) .* system.box
 
-                    q₁ = f.charge[i]
-                    q₂ = f.charge[j]
-
                     # depends on if j-atom is in i-atom's exlusion list,
                     # we either substract k-space or add real space
                     # contributions from the unit cell
                     if j ∈ f.exlusion[i]
-                        fac = -KE * q₁ * q₂
+                        fac = -KE * f.charge[i] * f.charge[j]
                         e, ∂e∂v = fac .* ewald_reciporical_potential(v, ewald.alpha)
                     else
                         # skip to next j-atom if r > rcut
@@ -534,7 +531,7 @@ function force!(system::AbstractSystem, f::CoulombForce, cl::LinkedCellList, ewa
                             continue
                         end
 
-                        fac = KE * q₁ * q₂
+                        fac = KE * f.charge[i] * f.charge[j]
                         e, ∂e∂v = fac .* ewald_real_potential(v, ewald.alpha)
                     end
 
@@ -567,19 +564,20 @@ function force!(system::AbstractSystem, f::CoulombForce, cl::LinkedCellList, ewa
 
     Threads.@threads for i in eachindex(ewald.kvectors, ewald.kfactors)
         forces = force(system, Threads.threadid())
+        qeir = ewald._qeir[Threads.threadid()]
         kx, ky, kz = ewald.kvectors[i]
         kfac = ewald.kfactors[i]
         kr = ewald.kvectors[i] .* recip_box
 
         term = zero(ComplexF64)
-        for j in 1 : length(charges)
-            term += charges[j] * ewald.eir[j, kx, 1] * ewald.eir[j, ky, 2] * ewald.eir[j, kz, 3]
+        @inbounds @simd for j in 1 : length(charges)
+            qeir[j] = charges[j] * ewald.eir[j, kx, 1] * ewald.eir[j, ky, 2] * ewald.eir[j, kz, 3]
+            term += qeir[j]
         end
         e_threads[Threads.threadid()] += kfac * real(conj(term) * term)
 
-        for j in 1 : length(charges)
-            qxyz = charges[j] * ewald.eir[j, kx, 1] * ewald.eir[j, ky, 2] * ewald.eir[j, kz, 3]
-            f_recip = 2 * kfac * imag(conj(term) * qxyz) .* kr
+        @inbounds @simd for j in 1 : length(charges)
+            f_recip = 2 * kfac * imag(conj(term) * qeir[j]) .* kr
             forces[j] += f_recip .* (KE * inv_v)
         end
     end
