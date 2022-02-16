@@ -24,12 +24,14 @@ function MMSystem(box,
 
     if isnothing(cutoff)
         cell_list = NullCellList()
+        rcut = 0.0
     else
-        cell_list = LinkedCellList(length(positions), float(cutoff), box)
+        rcut = float(cutoff)
+        cell_list = LinkedCellList(length(positions), rcut, box)
     end
     C = typeof(cell_list)
 
-    MMSystem{D, C, N, K, V}(box, positions, velocities, forces, masses, atomic_numbers, force_groups, cell_list, cutoff, Cache(Float64), Cache(SVector{D, Float64}))
+    MMSystem{D, C, N, K, V}(box, positions, velocities, forces, masses, atomic_numbers, force_groups, cell_list, rcut, Cache(Float64), Cache(SVector{D, Float64}))
 end
 
 position(s::AbstractSystem)      = s.positions
@@ -69,6 +71,15 @@ function force!(s::AbstractSystem, force_group::ForceGroup{<:Vector{<:AbstractFo
     e = 0.0
     for f in force_group.forces
         e += force!(s, f)
+    end
+    return e
+end
+
+function force!(s::AbstractSystem, force_group::ForceGroup{<:CoulombForce})
+    if isnothing(force_group.forces.ewald)
+        e = force!(s, force_group.forces, s.cell_list)
+    else
+        e = force!(s, force_group.forces, s.cell_list, force_group.forces.ewald)
     end
     return e
 end

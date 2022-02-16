@@ -4,12 +4,18 @@ function MMSystem(parm7::AbstractString, rst7::AbstractString; cutoff=nothing)
     amb = pyimport("parmed.amber")
     parm = amb.AmberParm(parm7, rst7)
 
+    # hard code Ewald parameters for now
+    alpha = 0.394670228244391 * 10
+    kmax = 20
+
     if isnothing(parm.box)
         box = [0., 0., 0.]
+        ewald = nothing
     elseif parm.box[4:6] != [90., 90., 90.]
         error("Only orthogonal box is supported")
     else
         box = parm.box[1:3] / 10.0
+        ewald = Ewald(alpha, length(parm.atoms), kmax, box)
     end
 
     positions = [SVector(x._value ./ 10.0) for x in parm.positions]
@@ -59,7 +65,7 @@ function MMSystem(parm7::AbstractString, rst7::AbstractString; cutoff=nothing)
     end
     force_group_vdw14 = ForceGroup(collect(vdw14_force))
 
-    elec_force = CoulombForce([atom.charge for atom in parm.atoms], nonbonded_exslusion)
+    elec_force = CoulombForce([atom.charge for atom in parm.atoms], nonbonded_exslusion, ewald)
     force_group_elec = ForceGroup(elec_force)
 
     elec14_force = Set{CoulombExceptionForce}()

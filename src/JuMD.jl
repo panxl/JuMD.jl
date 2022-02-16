@@ -3,12 +3,14 @@ module JuMD
 using LinearAlgebra
 using OffsetArrays
 using PeriodicTable
+using SpecialFunctions
 using StaticArrays
 using Unitful
 
 include("constants.jl")
 include("caches.jl")
 include("cell_list.jl")
+include("ewald.jl")
 include("forces.jl")
 include("switching.jl")
 include("forcegroups.jl")
