@@ -18,7 +18,7 @@ function Ewald(alpha, natoms, kmax, box)
     b = -1 / (4 * alpha^2)
     recip_box = 2 * pi ./ box
 
-    for i in eachindex(kvectors, kfactors)
+    @inbounds for i in eachindex(kvectors, kfactors)
         k = kvectors[i]
         kr = k .* recip_box
         kr² = kr ⋅ kr
@@ -35,14 +35,14 @@ function update!(ewald::Ewald, r_box)
     kmax = (size(eir)[2] - 1) ÷ 2
     natoms = size(eir)[1]
 
-    # k = 0 and 1
-    for i in 1 : natoms
-        eir[i, 0, :] .= one(ComplexF64)
-        eir[i, 1, :] = cos.(2 * pi * r_box[i]) + sin.(2 * pi * r_box[i])im
-    end
+    @inbounds for m in 1 : 3
+        # k = 0 and 1
+        for i in 1 : natoms
+            eir[i, 0, m] = one(ComplexF64)
+            eir[i, 1, m] = cos(2 * pi * r_box[i][m]) + sin(2 * pi * r_box[i][m])im
+        end
 
-    # k from 2 to kmax
-    for m in 1 : 3
+        # k from 2 to kmax
         for j in 2 : kmax
             for i in 1 : natoms
                 eir[i, j, m] = eir[i, j - 1, m] * eir[i, 1, m]
@@ -51,7 +51,7 @@ function update!(ewald::Ewald, r_box)
     end
 
     # negative k values are complex conjugates of positive ones
-    for m in 1 : 2
+    @inbounds for m in 1 : 2
         for j in 1 : kmax
             for i in 1 : natoms
                 eir[i, -j, m] = conj(eir[i, j, m])
@@ -70,7 +70,7 @@ function update!(ewald::Ewald, r_box, box)
     b = -1 / (4 * alpha^2)
     recip_box = 2 * pi ./ box
 
-    for i in eachindex(kvectors, kfactors)
+    @inbounds for i in eachindex(kvectors, kfactors)
         k = kvectors[i]
         kr = k .* recip_box
         kr² = kr ⋅ kr
