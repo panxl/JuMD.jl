@@ -317,6 +317,7 @@ struct CoulombForce{E<:Union{Ewald,Nothing}} <: AbstractForce
 end
 
 CoulombForce(charge) = CoulombForce(charge, [Set{Int}() for _ in 1 : length(charge)], nothing)
+CoulombForce(charge, ewald::Ewald) = CoulombForce(charge, [Set{Int}() for _ in 1 : length(charge)], ewald)
 
 function force!(system::AbstractSystem, f::CoulombForce, cl::NullCellList)
     natoms = length(f.charge)

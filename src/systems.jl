@@ -13,11 +13,12 @@ struct MMSystem{D, C, N, K, V} <:AbstractSystem{D}
 end
 
 function MMSystem(box,
-                  positions::AbstractVector{SVector{D, F}},
-                  masses::AbstractVector{F},
-                  atomic_numbers::AbstractVector{I},
+                  positions,
+                  masses,
+                  atomic_numbers,
                   force_groups::ForceGroups{K,V};
-                  cutoff=nothing) where {D, F<:AbstractFloat, I<:Integer, K, V}
+                  cutoff=nothing) where {K, V}
+    positions = SVector.(positions)
     N = Threads.nthreads()
     velocities = zero(positions)
     forces = ntuple(i -> zero(positions), N)
@@ -29,6 +30,7 @@ function MMSystem(box,
         rcut = float(cutoff)
         cell_list = LinkedCellList(length(positions), rcut, box)
     end
+    D = length(eltype(positions))
     C = typeof(cell_list)
 
     MMSystem{D, C, N, K, V}(box, positions, velocities, forces, masses, atomic_numbers, force_groups, cell_list, rcut, Cache(Float64), Cache(SVector{D, Float64}))
