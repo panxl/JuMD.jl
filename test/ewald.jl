@@ -20,6 +20,11 @@ system = MMSystem(box, positions, masses, atomic_numbers, force_groups, cutoff=c
 JuMD.force!(system)
 
 e = (system.force_groups.energies / JuMD.KE)[1]
-e_ref = -1.0021255 # DOI: 10.1063/1.481216
+f = JuMD.force(system)[1][1] / JuMD.KE
+
+# DOI: 10.1063/1.481216
+e_ref = -1.0021255 
+f_ref = -0.9956865
 
 @test round(e, sigdigits=8) == e_ref
+@test round(f, sigdigits=7) == f_ref
