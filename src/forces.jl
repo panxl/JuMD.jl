@@ -560,3 +560,19 @@ function force!(system::AbstractSystem, f::CoulombForce, cl::LinkedCellList, rec
 
     return e_sum
 end
+
+function ewald_real_potential(v, α)
+    r² = v ⋅ v
+    r = sqrt(r²)
+    e =  erfc(α * r) / r
+    ∂e∂v = -(e + 2 * α * exp(-(α * r)^2) / SQRTPI) / r² * v
+    return e, ∂e∂v
+end
+
+function ewald_recip_potential(v, α)
+    r² = v ⋅ v
+    r = sqrt(r²)
+    e = erf(α * r) / r
+    ∂e∂v = -(e - 2 * α * exp(-(α * r)^2) / SQRTPI) / r² * v
+    return e, ∂e∂v
+end
