@@ -15,7 +15,7 @@ function MMSystem(parm7::AbstractString, rst7::AbstractString; cutoff=nothing)
         error("Only orthogonal box is supported")
     else
         box = parm.box[1:3] / 10.0
-        ewald = Ewald(alpha, length(parm.atoms), kmax, box)
+        ewald = EwaldRecip(alpha, length(parm.atoms), kmax, box)
     end
 
     positions = [SVector(x._value ./ 10.0) for x in parm.positions]

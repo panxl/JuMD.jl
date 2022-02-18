@@ -310,14 +310,14 @@ function lennard_jones_force(v, σ, ϵ)
     return e, ∂e∂v
 end
 
-struct CoulombForce{E<:Union{Ewald,Nothing}} <: AbstractForce
+struct CoulombForce{E<:Union{EwaldRecip,Nothing}} <: AbstractForce
     charge::Vector{Float64}
     exlusion::Vector{Set{Int}}
-    ewald::E
+    recip::E
 end
 
 CoulombForce(charge) = CoulombForce(charge, [Set{Int}() for _ in 1 : length(charge)], nothing)
-CoulombForce(charge, ewald::Ewald) = CoulombForce(charge, [Set{Int}() for _ in 1 : length(charge)], ewald)
+CoulombForce(charge, recip::EwaldRecip) = CoulombForce(charge, [Set{Int}() for _ in 1 : length(charge)], recip)
 
 function force!(system::AbstractSystem, f::CoulombForce, cl::NullCellList)
     natoms = length(f.charge)
@@ -477,7 +477,7 @@ function coulomb_potential(v)
     return e, ∂e∂v
 end
 
-function force!(system::AbstractSystem, f::CoulombForce, cl::LinkedCellList, ewald::Ewald)
+function force!(system::AbstractSystem, f::CoulombForce, cl::LinkedCellList, recip::EwaldRecip)
     positions = position(system)
     ncells = size(cl.head)
     rcut = system.cutoff
@@ -523,7 +523,7 @@ function force!(system::AbstractSystem, f::CoulombForce, cl::LinkedCellList, ewa
                     # contributions from the unit cell
                     if j ∈ f.exlusion[i]
                         fac = -KE * f.charge[i] * f.charge[j]
-                        e, ∂e∂v = fac .* ewald_reciporical_potential(v, ewald.alpha)
+                        e, ∂e∂v = fac .* ewald_recip_potential(v, recip.alpha)
                     else
                         # skip to next j-atom if r > rcut
                         r² = v ⋅ v
@@ -533,7 +533,7 @@ function force!(system::AbstractSystem, f::CoulombForce, cl::LinkedCellList, ewa
                         end
 
                         fac = KE * f.charge[i] * f.charge[j]
-                        e, ∂e∂v = fac .* ewald_real_potential(v, ewald.alpha)
+                        e, ∂e∂v = fac .* ewald_real_potential(v, recip.alpha)
                     end
 
                     forces[i] += ∂e∂v
@@ -554,39 +554,7 @@ function force!(system::AbstractSystem, f::CoulombForce, cl::LinkedCellList, ewa
 
     # k-space
 
-    fractional_coordinates = fractional_coordinate(system)
-    update!(ewald, fractional_coordinates)
-
-    charges = f.charge
-    recip_box = 2 * pi ./ system.box
-    inv_v = 1 / prod(system.box)
-
-    fill!(e_threads, zero(eltype(e_threads)))
-
-    Threads.@threads for i in eachindex(ewald.kvectors, ewald.kfactors)
-        forces = force(system, Threads.threadid())
-        qeir = ewald._qeir[Threads.threadid()]
-        kx, ky, kz = ewald.kvectors[i]
-        kfac = ewald.kfactors[i]
-        kr = ewald.kvectors[i] .* recip_box
-
-        term = zero(ComplexF64)
-        @inbounds @simd for j in 1 : length(charges)
-            qeir[j] = charges[j] * ewald.eir[j, kx, 1] * ewald.eir[j, ky, 2] * ewald.eir[j, kz, 3]
-            term += qeir[j]
-        end
-        e_threads[Threads.threadid()] += kfac * real(conj(term) * term)
-
-        @inbounds @simd for j in 1 : length(charges)
-            f_recip = 2 * kfac * imag(conj(term) * qeir[j]) .* kr
-            forces[j] += f_recip .* (KE * inv_v)
-        end
-    end
-
-    e_recip = sum(e_threads) * KE / prod(system.box)
-
-    # substract self part of k-space sum
-    e_recip -= KE * ewald.alpha * (charges ⋅ charges) / SQRTPI
+    e_recip = recip(positions, system.box, f.charge, system.forces)
 
     e_sum += e_recip
 

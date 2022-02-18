@@ -78,10 +78,10 @@ function force!(s::AbstractSystem, force_group::ForceGroup{<:Vector{<:AbstractFo
 end
 
 function force!(s::AbstractSystem, force_group::ForceGroup{<:CoulombForce})
-    if isnothing(force_group.forces.ewald)
+    if isnothing(force_group.forces.recip)
         e = force!(s, force_group.forces, s.cell_list)
     else
-        e = force!(s, force_group.forces, s.cell_list, force_group.forces.ewald)
+        e = force!(s, force_group.forces, s.cell_list, force_group.forces.recip)
     end
     return e
 end
