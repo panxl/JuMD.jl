@@ -1,6 +1,6 @@
-const SQRTPI = sqrt(pi)
+abstract type AbstractRecip end
 
-struct EwaldRecip{D, N}
+struct EwaldRecip{D, N} <: AbstractRecip
     alpha::Float64
     kvectors::Vector{NTuple{D, Int}}
     eir::OffsetArray{ComplexF64, 3, Array{ComplexF64, 3}}
@@ -49,7 +49,7 @@ function update!(recip::EwaldRecip, positions, box)
     end
 end
 
-function (recip::EwaldRecip)(positions, box, charges, force_array)
+function (recip::EwaldRecip)(box, charges, positions, force_array)
     update!(recip, positions, box)
 
     alpha = recip.alpha

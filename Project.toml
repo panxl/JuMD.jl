@@ -12,6 +12,7 @@ PyCall = "438e738f-606a-5dbb-bf0a-cddfbfd45ab0"
 SpecialFunctions = "276daf66-3868-5448-9aa4-cd146d93841b"
 StaticArrays = "90137ffa-7385-5640-81b9-e52037218182"
 Unitful = "1986cc42-f94f-5a68-af5c-568840ba703d"
+helpme_jll = "f33c8c47-f3e6-5e52-bf5f-5eacb4024144"
 
 [compat]
 julia = "1.7"

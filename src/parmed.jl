@@ -7,15 +7,18 @@ function MMSystem(parm7::AbstractString, rst7::AbstractString; cutoff=nothing)
     # hard code Ewald parameters for now
     alpha = 0.394670228244391 * 10
     kmax = 20
+    spline_order = 6
 
     if isnothing(parm.box)
         box = [0., 0., 0.]
-        ewald = nothing
+        recip = nothing
     elseif parm.box[4:6] != [90., 90., 90.]
         error("Only orthogonal box is supported")
     else
         box = parm.box[1:3] / 10.0
-        ewald = EwaldRecip(alpha, length(parm.atoms), kmax, box)
+        gridpoints = Tuple(floor.(Int, parm.box[1:3]))
+        # ewald = EwaldRecip(alpha, length(parm.atoms), kmax, box)
+        recip = PMERecip(alpha, spline_order, gridpoints, JuMD.KE, Threads.nthreads())
     end
 
     positions = [SVector(x._value ./ 10.0) for x in parm.positions]
@@ -46,6 +49,8 @@ function MMSystem(parm7::AbstractString, rst7::AbstractString; cutoff=nothing)
         end
     end
 
+    nonbonded_exslusion = collect.(nonbonded_exslusion)
+
     vdw_force = LennardJonesForce([atom.sigma/10.0/2 for atom in parm.atoms], [2*sqrt(atom.epsilon*4.184) for atom in parm.atoms], nonbonded_exslusion)
     force_group_vdw = ForceGroup(vdw_force)
 
@@ -65,7 +70,7 @@ function MMSystem(parm7::AbstractString, rst7::AbstractString; cutoff=nothing)
     end
     force_group_vdw14 = ForceGroup(collect(vdw14_force))
 
-    elec_force = CoulombForce([atom.charge for atom in parm.atoms], nonbonded_exslusion, ewald)
+    elec_force = CoulombForce([atom.charge for atom in parm.atoms], nonbonded_exslusion, recip)
     force_group_elec = ForceGroup(elec_force)
 
     elec14_force = Set{CoulombExceptionForce}()

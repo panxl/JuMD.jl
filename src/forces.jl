@@ -138,7 +138,7 @@ end
 struct LennardJonesForce <: AbstractForce
     sigma::Vector{Float64}
     epsilon::Vector{Float64}
-    exlusion::Vector{Set{Int}}
+    exlusion::Vector{Vector{Int}}
 end
 
 LennardJonesForce(sigma, epsilon) = LennardJonesForce(sigma, epsilon, [Set{Int}() for _ in 1 : length(sigma)])
@@ -194,7 +194,7 @@ function force!(system::AbstractSystem, f::LennardJonesForce, cl::LinkedCellList
         i = cl.head[ci]
         forces = force(system, Threads.threadid())
 
-        while i != 0
+        @inbounds while i != 0
             # skip to next i-atom if i-atom's epsilon is zero
             if f.epsilon[i] == 0.0
                 i = cl.list[i]
@@ -310,14 +310,14 @@ function lennard_jones_force(v, σ, ϵ)
     return e, ∂e∂v
 end
 
-struct CoulombForce{E<:Union{EwaldRecip,Nothing}} <: AbstractForce
+struct CoulombForce{E<:Union{<:AbstractRecip, Nothing}} <: AbstractForce
     charge::Vector{Float64}
-    exlusion::Vector{Set{Int}}
+    exlusion::Vector{Vector{Int}}
     recip::E
 end
 
-CoulombForce(charge) = CoulombForce(charge, [Set{Int}() for _ in 1 : length(charge)], nothing)
-CoulombForce(charge, recip::EwaldRecip) = CoulombForce(charge, [Set{Int}() for _ in 1 : length(charge)], recip)
+CoulombForce(charge) = CoulombForce(charge, [Vector{Int}() for _ in 1 : length(charge)], nothing)
+CoulombForce(charge, recip) = CoulombForce(charge, [Vector{Int}() for _ in 1 : length(charge)], recip)
 
 function force!(system::AbstractSystem, f::CoulombForce, cl::NullCellList)
     natoms = length(f.charge)
@@ -368,7 +368,7 @@ function force!(system::AbstractSystem, f::CoulombForce, cl::LinkedCellList)
         i = cl.head[ci]
         forces = force(system, Threads.threadid())
 
-        while i != 0
+        @inbounds while i != 0
             # skip to next i-atom if i-atom's charge is zero
             if f.charge[i] == 0.0
                 i = cl.list[i]
@@ -477,7 +477,7 @@ function coulomb_potential(v)
     return e, ∂e∂v
 end
 
-function force!(system::AbstractSystem, f::CoulombForce, cl::LinkedCellList, recip::EwaldRecip)
+function force!(system::AbstractSystem, f::CoulombForce, cl::LinkedCellList, recip::AbstractRecip)
     positions = position(system)
     ncells = size(cl.head)
     rcut = system.cutoff
@@ -488,7 +488,7 @@ function force!(system::AbstractSystem, f::CoulombForce, cl::LinkedCellList, rec
         i = cl.head[ci]
         forces = force(system, Threads.threadid())
 
-        while i != 0
+        @inbounds while i != 0
             # skip to next i-atom if i-atom's charge is zero
             if f.charge[i] == 0.0
                 i = cl.list[i]
@@ -554,7 +554,7 @@ function force!(system::AbstractSystem, f::CoulombForce, cl::LinkedCellList, rec
 
     # k-space
 
-    e_recip = recip(positions, system.box, f.charge, system.forces)
+    e_recip = recip(system.box, f.charge, positions, system.forces)
 
     e_sum += e_recip
 
