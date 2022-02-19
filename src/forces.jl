@@ -442,8 +442,7 @@ end
 
 struct CoulombExceptionForce <: AbstractForce
     indices::Tuple{Int, Int}
-    charges::Tuple{Float64, Float64}
-    scaling::Float64
+    charge_prod::Float64
 end
 
 function force!(system::AbstractSystem, f::CoulombExceptionForce)
@@ -460,7 +459,7 @@ function force!(system::AbstractSystem, f::CoulombExceptionForce)
         v = minimum_image(v ./ system.box) .* system.box
     end
 
-    fac = f.scaling * KE * f.charges[1] * f.charges[2]
+    fac = KE * f.charge_prod
     e, ∂e∂v = fac .* coulomb_potential(v)
 
     forces[i] += ∂e∂v
@@ -564,7 +563,7 @@ end
 function ewald_real_potential(v, α)
     r² = v ⋅ v
     r = sqrt(r²)
-    e =  erfc(α * r) / r
+    e = erfc(α * r) / r
     ∂e∂v = -(e + 2 * α * exp(-(α * r)^2) / SQRTPI) / r² * v
     return e, ∂e∂v
 end

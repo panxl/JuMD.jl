@@ -80,7 +80,8 @@ function MMSystem(parm7::AbstractString, rst7::AbstractString; cutoff=nothing)
             index2 = dihedral.atom4.idx + 1
             q1 = parm.atoms[index1].charge
             q2 = parm.atoms[index2].charge
-            push!(elec14_force, CoulombExceptionForce((index1, index2), (q1, q2), 1 / dihedral.type.scee))
+            charge_prod = q1 * q2 / dihedral.type.scee
+            push!(elec14_force, CoulombExceptionForce((index1, index2), charge_prod))
         end
     end
     force_group_elec14 = ForceGroup(collect(elec14_force))
