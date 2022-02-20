@@ -11,18 +11,21 @@ struct LinkedCellList{D} <: AbstractCellList
     offsets::Vector{CartesianIndex{D}}
 end
 
-function LinkedCellList(natoms, cellsize, box)
+function LinkedCellList(natoms, rsch, box; ratio=1.0)
     D = length(box)
     cells = Vector{CartesianIndex{D}}(undef, natoms)
     list = Vector{Int}(undef, natoms)
+    cellsize = rsch * ratio
     ncells = map(b -> floor(Int, b / cellsize), Tuple(box))
+    nmax = ceil(Int, 1 / ratio)
 
-    if any(ncells .< 3)
+    if any(ncells .< 2 * nmax + 1)
         error("Box is too small for the cutoff")
     end
 
     head = OffsetArray(zeros(Int, ncells), CartesianIndex(ntuple(i -> 0, D)...):CartesianIndex((ncells .- 1)...))
-    offsets = CartesianIndices((fill(-1 : 1, D)...,))[1 : (3^D + 1) ÷ 2]
+    offsets = CartesianIndices((fill(-nmax : nmax, D)...,))[1 : ((2 * nmax + 1)^D + 1) ÷ 2]
+    offsets = filter(offset -> norm(Tuple(offset) .- sign.(Tuple(offset))) < 1 / ratio, offsets)
     LinkedCellList(cells, list, head, offsets)
 end
 
