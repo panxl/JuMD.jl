@@ -65,6 +65,17 @@ function MMSystem(parm7::AbstractString, rst7::AbstractString; cutoff=nothing)
         end
     end
 
+    vdw = LennardJonesForce(cutoff=cutoff)
+    elec = CoulombForce(cutoff=cutoff, recip=recip)
+    for (i, atom) in enumerate(parm.atoms)
+        push!(vdw.sigma, atom.sigma / 10.0 / 2)
+        push!(vdw.epsilon, 2 * sqrt(atom.epsilon * 4.184))
+        push!(elec.charges, atom.charge)
+        exclusion = sort(collect(nonbonded_exclusion[i]))
+        push!(vdw.exclusion, exclusion)
+        push!(elec.exclusion, exclusion)
+    end
+
     vdw14 = LennardJonesExceptionForce()
     elec14 = CoulombExceptionForce()
     indice_set = Set()
@@ -74,34 +85,23 @@ function MMSystem(parm7::AbstractString, rst7::AbstractString; cutoff=nothing)
             index2 = dihedral.atom4.idx + 1
             if (index1, index2) ∉ indice_set
                 push!(indice_set, (index1, index2))
-
-                sigma1 = parm.atoms[index1].sigma
-                sigma2 = parm.atoms[index2].sigma
-                epsilon1 = parm.atoms[index1].epsilon
-                epsilon2 = parm.atoms[index2].epsilon
-                sigma = (sigma1 + sigma2) / 2
-                epsilon = 4 * sqrt(epsilon1 * epsilon2) / dihedral.type.scnb
+                sigma1 = vdw.sigma[index1]
+                sigma2 = vdw.sigma[index2]
+                epsilon1 = vdw.epsilon[index1]
+                epsilon2 = vdw.epsilon[index2]
+                sigma = sigma1 + sigma2
+                epsilon = epsilon1 * epsilon2 / dihedral.type.scnb
                 push!(vdw14.indices, (index1, index2))
-                push!(vdw14.sigma, sigma / 10.0)
-                push!(vdw14.epsilon, epsilon * 4.184)
+                push!(vdw14.sigma, sigma)
+                push!(vdw14.epsilon, epsilon)
 
-                q1 = parm.atoms[index1].charge
-                q2 = parm.atoms[index2].charge
+                q1 = elec.charges[index1]
+                q2 = elec.charges[index2]
                 charge_prod = q1 * q2 / dihedral.type.scee
                 push!(elec14.indices, (index1, index2))
                 push!(elec14.charge_prod, charge_prod)
             end
         end
-    end
-
-    nonbonded_exclusion = collect.(nonbonded_exclusion)
-
-    vdw = LennardJonesForce(exclusion=nonbonded_exclusion, cutoff=cutoff)
-    elec = CoulombForce(exclusion=nonbonded_exclusion, cutoff=cutoff, recip=recip)
-    for atom in parm.atoms
-        push!(vdw.sigma, atom.sigma / 10.0 / 2)
-        push!(vdw.epsilon, 2 * sqrt(atom.epsilon * 4.184))
-        push!(elec.charges, atom.charge)
     end
 
     force_groups = ForceGroups(groups=(bonds=bonds, angles=angles, dihedrals=dihedrals, vdw=vdw, vdw14=vdw14, elec=elec, elec14=elec14))
