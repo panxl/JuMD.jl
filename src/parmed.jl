@@ -4,11 +4,6 @@ function MMSystem(parm7::AbstractString, rst7::AbstractString; cutoff=nothing)
     amb = pyimport("parmed.amber")
     parm = amb.AmberParm(parm7, rst7)
 
-    # hard code Ewald parameters for now
-    alpha = 0.394670228244391 * 10
-    kmax = 20
-    spline_order = 6
-
     if isnothing(parm.box)
         box = [0., 0., 0.]
         recip = nothing
@@ -16,9 +11,7 @@ function MMSystem(parm7::AbstractString, rst7::AbstractString; cutoff=nothing)
         error("Only orthogonal box is supported")
     else
         box = parm.box[1:3] / 10.0
-        gridpoints = Tuple(floor.(Int, parm.box[1:3]))
-        # ewald = EwaldRecip(alpha, length(parm.atoms), kmax, box)
-        recip = PMERecip(alpha, spline_order, gridpoints, JuMD.KE, Threads.nthreads())
+        recip = PMERecip(box, cutoff, scaling=JuMD.KE, nthreads=Threads.nthreads())
     end
 
     positions = [(x._value ./ 10.0) for x in parm.positions]

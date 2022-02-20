@@ -16,6 +16,17 @@ function EwaldRecip(alpha, natoms, kmax, box)
     EwaldRecip(alpha, kvectors, eir, _qeir)
 end
 
+function EwaldRecip(box, cutoff, natoms; tol=1e-5, alpha=nothing, kmax=nothing)
+    if isnothing(alpha)
+        alpha = get_ewald_alpha(cutoff, tol)
+    end
+    if isnothing(kmax)
+        # hard code for now
+        kmax = 20
+    end
+    EwaldRecip(alpha, natoms, kmax, box)
+end
+
 function update!(recip::EwaldRecip, positions, box)
     eir = recip.eir
     kmax = (size(eir)[2] - 1) ÷ 2
@@ -94,4 +105,22 @@ function (recip::EwaldRecip)(box, charges, positions, force_array)
     e_sum -= KE * alpha * (charges ⋅ charges) / SQRTPI
 
     return e_sum
+end
+
+function get_ewald_alpha(cutoff, tol)
+    alpha = 1
+    while erfc(alpha * cutoff) / cutoff >= tol
+        alpha *= 2
+    end
+    alpha_lo = 0
+    alpha_hi = alpha
+    for _ in 1:100
+        alpha = .5 * (alpha_lo + alpha_hi)
+        if erfc(alpha * cutoff) / cutoff >= tol
+            alpha_lo = alpha
+        else
+            alpha_hi = alpha
+        end
+    end
+    return alpha
 end
