@@ -1,4 +1,6 @@
-struct MMSystem{D, C, N, K, V} <:AbstractSystem{D}
+abstract type AbstractSystem end
+
+struct MMSystem{D, C, N, K, V} <: AbstractSystem
     box::SVector{D, Float64}
     positions::Vector{SVector{D, Float64}}
     velocities::Vector{SVector{D, Float64}}
@@ -7,7 +9,6 @@ struct MMSystem{D, C, N, K, V} <:AbstractSystem{D}
     atomic_numbers::Vector{Int}
     force_groups::ForceGroups{K, V}
     cell_list::C
-    cutoff::Float64
     scache::Cache{Float64}
     vcache::Cache{SVector{D, Float64}}
 end
@@ -16,24 +17,31 @@ function MMSystem(box,
                   positions,
                   masses,
                   atomic_numbers,
-                  force_groups::ForceGroups{K,V};
-                  cutoff=nothing) where {K, V}
-    positions = SVector.(positions)
+                  force_groups::ForceGroups{K,V}) where {K, V}
     N = Threads.nthreads()
+    positions = SVector.(positions)
     velocities = zero(positions)
     forces = ntuple(i -> zero(positions), N)
 
-    if isnothing(cutoff)
-        cell_list = NullCellList()
-        rcut = 0.0
-    else
-        rcut = float(cutoff)
-        cell_list = LinkedCellList(length(positions), rcut, box)
+    # check cutoff for force groups and set cell list accordingly
+    cutoffs = []
+    for group in force_groups.groups
+        if hasfield(typeof(group), :cutoff) && !isnothing(group.cutoff)
+            push!(cutoffs, group.cutoff)
+        end
     end
+    if isempty(cutoffs)
+        cell_list = NullCellList()
+    elseif all(map(cutoff -> cutoff == first(cutoffs), cutoffs))
+        cell_list = LinkedCellList(length(positions), first(cutoffs), box)
+    else
+        error("Cutoffs have to be the same for all force groups")
+    end
+
     D = length(eltype(positions))
     C = typeof(cell_list)
 
-    MMSystem{D, C, N, K, V}(box, positions, velocities, forces, masses, atomic_numbers, force_groups, cell_list, rcut, Cache(Float64), Cache(SVector{D, Float64}))
+    MMSystem{D, C, N, K, V}(box, positions, velocities, forces, masses, atomic_numbers, force_groups, cell_list, Cache(Float64), Cache(SVector{D, Float64}))
 end
 
 position(s::AbstractSystem)      = s.positions
@@ -69,42 +77,34 @@ function fractional_coordinate!(s::AbstractSystem)
     return s.vcache.fractional_coordinates
 end
 
-function force!(s::AbstractSystem, force_group::ForceGroup{<:Vector{<:AbstractForce}})
-    e = 0.0
-    for f in force_group.forces
-        e += force!(s, f)
-    end
+function force!(system::AbstractSystem, forces::LennardJonesForce)
+    e = force!(system, forces, system.cell_list)
     return e
 end
 
-function force!(s::AbstractSystem, force_group::ForceGroup{<:CoulombForce})
-    if isnothing(force_group.forces.recip)
-        e = force!(s, force_group.forces, s.cell_list)
+function force!(system::AbstractSystem, forces::CoulombForce)
+    if isnothing(forces.recip)
+        e = force!(system, forces, system.cell_list)
     else
-        e = force!(s, force_group.forces, s.cell_list, force_group.forces.recip)
+        e = force!(system, forces, system.cell_list, forces.recip)
     end
     return e
 end
 
-function force!(s::AbstractSystem, force_group::ForceGroup{<:AbstractForce})
-    e = force!(s, force_group.forces, s.cell_list)
-    return e
-end
-
-function force!(s::AbstractSystem, force_groups::ForceGroups)
+function force!(system::AbstractSystem, force_groups::ForceGroups)
     for i in 1:Threads.nthreads()
-        forces = force(s, i)
+        forces = force(system, i)
         fill!(forces, zeros(eltype(forces)))
     end
-    r_box = fractional_coordinate!(s)
-    update!(s.cell_list, r_box)
-    force_groups.energies .= map(fg::ForceGroup -> force!(s, fg), values(force_groups.groups))
+    r_box = fractional_coordinate!(system)
+    update!(system.cell_list, r_box)
+    force_groups.energies .= map(f -> force!(system, f), values(force_groups.groups))
     for i in 2:Threads.nthreads()
-        forces = force(s, i)
-        force(s) .+= forces
+        forces = force(system, i)
+        force(system) .+= forces
         fill!(forces, zeros(eltype(forces)))
     end
     return nothing
 end
 
-force!(s::AbstractSystem) = force!(s, s.force_groups)
+force!(system::AbstractSystem) = force!(system, system.force_groups)

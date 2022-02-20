@@ -1,5 +1,5 @@
 using JuMD
-using JuMD: MMSystem, ForceGroups, ForceGroup, CoulombForce, EwaldRecip
+using JuMD: MMSystem, ForceGroups, CoulombForce, EwaldRecip
 using Test
 
 natoms = 2
@@ -14,10 +14,9 @@ masses = [1.0, 1.0]
 atomic_numbers = [1, 1]
 
 recip = EwaldRecip(alpha, natoms, kmax, box)
-elec_force = CoulombForce(charges, recip)
-force_group_elec = ForceGroup(elec_force)
-force_groups = ForceGroups((elec=force_group_elec,))
-system = MMSystem(box, positions, masses, atomic_numbers, force_groups, cutoff=cutoff)
+elec = CoulombForce(charges=charges, cutoff=cutoff, recip=recip)
+force_groups = ForceGroups(groups=(elec=elec,))
+system = MMSystem(box, positions, masses, atomic_numbers, force_groups)
 JuMD.force!(system)
 
 e = (system.force_groups.energies / JuMD.KE)[1]

@@ -1,9 +1,9 @@
 abstract type AbstractIntegrator end
 
-struct VerlocityVerletIntegrator{T,C} <: AbstractIntegrator
+Base.Base.@kwdef struct VerlocityVerletIntegrator{T, C} <: AbstractIntegrator
     dt::Float64
-    thermostat::T
-    constraint::C
+    thermostat::T = NullThermostat
+    constraint::C = NullConstraint
 end
 
 function (integrator::VerlocityVerletIntegrator)(system::AbstractSystem)
