@@ -29,7 +29,7 @@ function MMSystem(box, positions, masses, atomic_numbers, force_groups::ForceGro
     if isempty(cutoffs)
         cell_list = NullCellList()
     elseif all(map(cutoff -> cutoff == first(cutoffs), cutoffs))
-        cell_list = LinkedCellList(length(positions), first(cutoffs), box)
+        cell_list = LinkedCellList(length(positions), first(cutoffs), box, ratio=0.5)
     else
         error("Cutoffs have to be the same for all force groups")
     end
