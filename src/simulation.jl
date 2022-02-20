@@ -1,6 +1,6 @@
 abstract type AbstractSimulation end
 
-struct Simulation{S<:AbstractSystem,I<:AbstractIntegrator,R} <: AbstractSimulation
+struct Simulation{S<:AbstractSystem, I<:AbstractIntegrator, R} <: AbstractSimulation
     system::S
     integrator::I
     reporters::R

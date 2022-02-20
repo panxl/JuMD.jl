@@ -6,7 +6,7 @@ Base.Base.@kwdef struct VerlocityVerletIntegrator{T, C} <: AbstractIntegrator
     constraint::C = NullConstraint
 end
 
-function (integrator::VerlocityVerletIntegrator)(system::AbstractSystem)
+function (integrator::VerlocityVerletIntegrator)(system)
     x = position(system)
     v = velocity(system)
     x_last = position_last(system)

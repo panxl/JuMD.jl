@@ -1,6 +1,6 @@
 abstract type AbstractSystem end
 
-struct MMSystem{D, C, N, K, V} <: AbstractSystem
+struct MMSystem{D, N, C, K, V} <: AbstractSystem
     box::SVector{D, Float64}
     positions::Vector{SVector{D, Float64}}
     velocities::Vector{SVector{D, Float64}}
@@ -13,11 +13,7 @@ struct MMSystem{D, C, N, K, V} <: AbstractSystem
     vcache::Cache{SVector{D, Float64}}
 end
 
-function MMSystem(box,
-                  positions,
-                  masses,
-                  atomic_numbers,
-                  force_groups::ForceGroups{K,V}) where {K, V}
+function MMSystem(box, positions, masses, atomic_numbers, force_groups::ForceGroups{K,V}) where {K, V}
     N = Threads.nthreads()
     positions = SVector.(positions)
     velocities = zero(positions)
@@ -41,7 +37,7 @@ function MMSystem(box,
     D = length(eltype(positions))
     C = typeof(cell_list)
 
-    MMSystem{D, C, N, K, V}(box, positions, velocities, forces, masses, atomic_numbers, force_groups, cell_list, Cache(Float64), Cache(SVector{D, Float64}))
+    MMSystem{D, N, C, K, V}(box, positions, velocities, forces, masses, atomic_numbers, force_groups, cell_list, Cache(Float64), Cache(SVector{D, Float64}))
 end
 
 position(s::AbstractSystem)      = s.positions
@@ -75,20 +71,6 @@ function fractional_coordinate!(s::AbstractSystem)
         s.vcache.fractional_coordinates[i] = s.positions[i] ./ s.box
     end
     return s.vcache.fractional_coordinates
-end
-
-function force!(system::AbstractSystem, forces::LennardJonesForce)
-    e = force!(system, forces, system.cell_list)
-    return e
-end
-
-function force!(system::AbstractSystem, forces::CoulombForce)
-    if isnothing(forces.recip)
-        e = force!(system, forces, system.cell_list)
-    else
-        e = force!(system, forces, system.cell_list, forces.recip)
-    end
-    return e
 end
 
 function force!(system::AbstractSystem, force_groups::ForceGroups)

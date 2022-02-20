@@ -2,6 +2,8 @@ abstract type AbstractCellList end
 
 struct NullCellList <: AbstractCellList end
 
+function update!(::NullCellList, r_box) end
+
 struct LinkedCellList{D} <: AbstractCellList
     cells::Vector{CartesianIndex{D}}
     list::Vector{Int}
@@ -35,8 +37,6 @@ function update!(cl::LinkedCellList, r_box)
     end
     return cl
 end
-
-function update!(::NullCellList, r_box) end
 
 # find cell index given fractional coordinates
 function find_cell(r_box, ncells)

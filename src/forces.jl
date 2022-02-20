@@ -155,6 +155,11 @@ Base.@kwdef struct LennardJonesForce{C<:Union{Float64, Nothing}} <: AbstractForc
     cutoff::C = nothing
 end
 
+function force!(system, forces::LennardJonesForce)
+    e = force!(system, forces, system.cell_list)
+    return e
+end
+
 function force!(system, f::LennardJonesForce, cl::NullCellList)
     natoms = length(f.epsilon)
     positions = position(system)
@@ -332,6 +337,15 @@ Base.@kwdef struct CoulombForce{C<:Union{Float64, Nothing}, E<:Union{<:AbstractR
     exclusion::Vector{Vector{Int}} = [Vector{Int}() for _ in 1 : length(charges)]
     cutoff::C = nothing
     recip::E = nothing
+end
+
+function force!(system, forces::CoulombForce)
+    if isnothing(forces.recip)
+        e = force!(system, forces, system.cell_list)
+    else
+        e = force!(system, forces, system.cell_list, forces.recip)
+    end
+    return e
 end
 
 function force!(system, f::CoulombForce, cl::NullCellList)
