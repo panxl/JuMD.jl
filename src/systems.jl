@@ -40,6 +40,8 @@ function MMSystem(box, positions, masses, atomic_numbers, force_groups::ForceGro
     MMSystem{D, N, C, K, V}(box, positions, velocities, forces, masses, atomic_numbers, force_groups, cell_list, Cache(Float64), Cache(SVector{D, Float64}))
 end
 
+bounding_box(s::AbstractSystem)  = s.box
+cell_list(s::AbstractSystem)     = s.cell_list
 position(s::AbstractSystem)      = s.positions
 velocity(s::AbstractSystem)      = s.velocities
 force(s::AbstractSystem)         = s.forces[1]
@@ -52,20 +54,3 @@ inverse_mass!(s::AbstractSystem) = hasproperty(s.scache, :inverse_masses) ? s.sc
 
 velocity_half(s::AbstractSystem) = !hasproperty(s.vcache, :velocities_half) ? s.vcache.velocities_half = similar(s.velocities) : s.vcache.velocities_half
 position_last(s::AbstractSystem) = !hasproperty(s.vcache, :positions_last) ? s.vcache.positions_last = similar(s.positions) : s.vcache.positions_last
-
-function force!(system::AbstractSystem, force_groups::ForceGroups)
-    for i in 1:Threads.nthreads()
-        forces = force(system, i)
-        fill!(forces, zeros(eltype(forces)))
-    end
-    update!(system.cell_list, system.positions, system.box)
-    force_groups.energies .= map(f -> force!(system, f), values(force_groups.groups))
-    for i in 2:Threads.nthreads()
-        forces = force(system, i)
-        force(system) .+= forces
-        fill!(forces, zeros(eltype(forces)))
-    end
-    return nothing
-end
-
-force!(system::AbstractSystem) = force!(system, system.force_groups)

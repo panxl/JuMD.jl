@@ -24,7 +24,7 @@ function Base.run(sim::AbstractSimulation, steps::Integer)
     end
 end
 
-function minimize!(system::AbstractSystem, steps, stepsize=0.001)
+function minimize!(system, steps, stepsize=0.001)
     positions = position(system)
     forces = force(system)
 

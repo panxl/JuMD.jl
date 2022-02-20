@@ -2,14 +2,14 @@ abstract type AbstractThermostat end
 
 struct NullThermostat <: AbstractThermostat end
 
-function (::NullThermostat)(system::AbstractSystem, dt) end
+function (::NullThermostat)(system, dt) end
 
 struct LangevinThermostat <: AbstractThermostat
     gamma::Float64
     T::Float64
 end
 
-function (thermostat::LangevinThermostat)(system::AbstractSystem, dt)
+function (thermostat::LangevinThermostat)(system, dt)
     kT = KB * thermostat.T
     v = velocity(system)
     inv_M = inverse_mass(system)
@@ -28,7 +28,7 @@ struct GJFThermostat <: AbstractThermostat
     T::Float64
 end
 
-function (thermostat::GJFThermostat)(system::AbstractSystem, dt)
+function (thermostat::GJFThermostat)(system, dt)
     kT = KB * thermostat.T
     v = velocity(system)
     inv_M = inverse_mass(system)

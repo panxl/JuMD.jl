@@ -5,7 +5,7 @@ struct StateReporter <: AbstractReporter
     path::String
 end
 
-function (reporter::StateReporter)(io::IO, system::AbstractSystem, current_step::Integer)
+function (reporter::StateReporter)(io::IO, system, current_step::Integer)
     if current_step == 1
         println(io, "# Step    T    Etot    Epot    Ekin")
     end
@@ -38,7 +38,7 @@ struct XYZTrajectoryReporter <: AbstractReporter
     path::String
 end
 
-function (reporter::XYZTrajectoryReporter)(io::IO, system::AbstractSystem, current_step)
+function (reporter::XYZTrajectoryReporter)(io::IO, system, current_step::Integer)
     if current_step % reporter.interval == 0
         positions = position(system)
         atomic_numbers = atomic_number(system)

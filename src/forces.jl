@@ -156,7 +156,7 @@ Base.@kwdef struct LennardJonesForce{C<:Union{Float64, Nothing}} <: AbstractForc
 end
 
 function force!(system, forces::LennardJonesForce)
-    e = force!(system, forces, system.cell_list)
+    e = force!(system, forces, cell_list(system))
     return e
 end
 
@@ -341,9 +341,9 @@ end
 
 function force!(system, forces::CoulombForce)
     if isnothing(forces.recip)
-        e = force!(system, forces, system.cell_list)
+        e = force!(system, forces, cell_list(system))
     else
-        e = force!(system, forces, system.cell_list, forces.recip)
+        e = force!(system, forces, cell_list(system), forces.recip)
     end
     return e
 end
@@ -608,3 +608,26 @@ function ewald_recip_potential(v, α)
     ∂e∂v = -(e - 2 * α * exp(-(α * r)^2) / SQRTPI) / r² * v
     return e, ∂e∂v
 end
+
+Base.Base.@kwdef struct ForceGroups{K, V}
+    groups::NamedTuple{K, V}
+    energies::Vector{Float64} = zeros(Float64, length(groups))
+    nrespa::Vector{Int} = ones(Int, length(groups))
+end
+
+function force!(system, force_groups::ForceGroups)
+    for i in 1:Threads.nthreads()
+        forces = force(system, i)
+        fill!(forces, zeros(eltype(forces)))
+    end
+    update!(cell_list(system), position(system), bounding_box(system))
+    force_groups.energies .= map(f -> force!(system, f), values(force_groups.groups))
+    for i in 2:Threads.nthreads()
+        forces = force(system, i)
+        force(system) .+= forces
+        fill!(forces, zeros(eltype(forces)))
+    end
+    return nothing
+end
+
+force!(system) = force!(system, system.force_groups)
