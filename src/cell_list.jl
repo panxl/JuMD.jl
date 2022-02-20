@@ -2,7 +2,7 @@ abstract type AbstractCellList end
 
 struct NullCellList <: AbstractCellList end
 
-function update!(::NullCellList, r_box) end
+function update!(::NullCellList, positions, box) end
 
 struct LinkedCellList{D} <: AbstractCellList
     cells::Vector{CartesianIndex{D}}
@@ -26,11 +26,13 @@ function LinkedCellList(natoms, cellsize, box)
     LinkedCellList(cells, list, head, offsets)
 end
 
-function update!(cl::LinkedCellList, r_box)
+function update!(cl::LinkedCellList, positions, box)
+    inv_box = 1 ./ box
     ncells = size(cl.head)
     fill!(cl.head, zero(eltype(cl.head)))
-    @inbounds for i in eachindex(r_box)
-        ci = find_cell(r_box[i], ncells)
+    @inbounds for i in eachindex(positions)
+        r_box = positions[i] .* inv_box
+        ci = find_cell(r_box, ncells)
         cl.cells[i] = ci
         cl.list[i] = cl.head[ci]
         cl.head[ci] = i
