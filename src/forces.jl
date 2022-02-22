@@ -292,6 +292,7 @@ end
 function force!(system, f::LennardJonesForce, nbl::NeighborList)
     positions = position(system)
     rcut = f.cutoff
+    rcut² = rcut^2
     e_threads = zeros(Threads.nthreads())
 
     Threads.@threads for i in 1 : length(positions)
@@ -326,6 +327,12 @@ function force!(system, f::LennardJonesForce, nbl::NeighborList)
             # apply minimum image convention
             if any(system.box .!= 0.0)
                 v = minimum_image(v ./ system.box) .* system.box
+            end
+
+            # skip to next j-atom if r > rcut
+            r² = v ⋅ v
+            if r² > rcut²
+                continue
             end
 
             σ = σ₁ + σ₂
