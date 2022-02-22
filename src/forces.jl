@@ -156,7 +156,11 @@ Base.@kwdef struct LennardJonesForce{C<:Union{Float64, Nothing}} <: AbstractForc
 end
 
 function force!(system, forces::LennardJonesForce)
-    e = force!(system, forces, cell_list(system))
+    if cell_list(system) isa NullCellList
+        e = force!(system, forces, cell_list(system))
+    else
+        e = force!(system, forces, neighbor_list(system))
+    end
     return e
 end
 
@@ -285,6 +289,65 @@ function force!(system, f::LennardJonesForce, cl::LinkedCellList)
     return e_sum
 end
 
+function force!(system, f::LennardJonesForce, nbl::NeighborList)
+    positions = position(system)
+    rcut = f.cutoff
+    e_threads = zeros(Threads.nthreads())
+
+    Threads.@threads for i in 1 : length(positions)
+        forces = force(system, Threads.threadid())
+
+        # skip to next i-atom if i-atom's epsilon is zero
+        ϵ₁ = f.epsilon[i]
+        if ϵ₁ == 0.0
+            continue
+        end
+
+        # load other i-atom's information
+        x1 = positions[i]
+        σ₁ = f.sigma[i]
+
+        ilist = nbl.list[i]
+        @inbounds for j_idx in 1 : nbl.n[i]
+            j = ilist[j_idx]
+
+            # skip to next j-atom if j-atom's epsilon is zero
+            ϵ₂ = f.epsilon[j]
+            if ϵ₂ == 0.0
+                continue
+            end
+
+            # load other j-atom's information
+            x2 = positions[j]
+            σ₂ = f.sigma[j]
+
+            v = x2 - x1
+
+            # apply minimum image convention
+            if any(system.box .!= 0.0)
+                v = minimum_image(v ./ system.box) .* system.box
+            end
+
+            σ = σ₁ + σ₂
+            ϵ = ϵ₁ * ϵ₂
+
+            e, ∂e∂v = lennard_jones_force(v, σ, ϵ)
+
+            # apply switching function
+            r = norm(v)
+            s, dsdr = shift(r, rcut)
+            ∂e∂v = ∂e∂v .* s + e * dsdr / r * v
+            e *= s
+
+            forces[i] += ∂e∂v
+            forces[j] -= ∂e∂v
+            e_threads[Threads.threadid()] += e
+        end
+    end
+    e_sum = sum(e_threads)
+    return e_sum
+end
+
 Base.@kwdef struct LennardJonesExceptionForce <: AbstractForce
     indices::Vector{Tuple{Int, Int}} = []
     sigma::Vector{Float64} = []
@@ -340,10 +403,12 @@ Base.@kwdef struct CoulombForce{C<:Union{Float64, Nothing}, E<:Union{<:AbstractR
 end
 
 function force!(system, forces::CoulombForce)
-    if isnothing(forces.recip)
+    if cell_list(system) isa NullCellList
         e = force!(system, forces, cell_list(system))
+    elseif isnothing(forces.recip)
+        e = force!(system, forces, neighbor_list(system))
     else
-        e = force!(system, forces, cell_list(system), forces.recip)
+        e = force!(system, forces, neighbor_list(system), forces.recip)
     end
     return e
 end
@@ -466,6 +531,90 @@ function force!(system, f::CoulombForce, cl::LinkedCellList)
     end # End loop over all cells
 
     e_sum = sum(e_threads)
+    return e_sum
+end
+
+function force!(system, f::CoulombForce, nbl::NeighborList, recip::AbstractRecip)
+    positions = position(system)
+    rcut = f.cutoff
+    rcut² = rcut^2
+    e_threads = zeros(Threads.nthreads())
+
+    Threads.@threads for i in 1 : length(positions)
+        forces = force(system, Threads.threadid())
+
+        # skip to next i-atom if i-atom's charge is zero
+        q₁ = f.charges[i]
+        if q₁ == 0.0
+            continue
+        end
+
+        # load other i-atom's information
+        x1 = positions[i]
+
+        ilist = nbl.list[i]
+        @inbounds for j_idx in 1 : nbl.n[i]
+            j = ilist[j_idx]
+
+            # skip to next j-atom if j-atom's epsilon is zero
+            q₂ = f.charges[j]
+            if q₂ == 0.0
+                continue
+            end
+
+            # load other j-atom's information
+            x2 = positions[j]
+
+            v = x2 - x1
+
+            # apply minimum image convention
+            v = minimum_image(v ./ system.box) .* system.box
+
+            # skip to next j-atom if r > rcut
+            r² = v ⋅ v
+            if r² > rcut²
+                continue
+            end
+
+            fac = KE * q₁ * q₂
+            e, ∂e∂v = fac .* ewald_real_potential(v, recip.alpha)
+
+            forces[i] += ∂e∂v
+            forces[j] -= ∂e∂v
+            e_threads[Threads.threadid()] += e
+        end
+
+        #substract k-space contributions from the unit cell
+        @inbounds for j in f.exclusion[i]
+            if j > i
+                continue
+            end
+
+            x2 = positions[j]
+            v = x2 - x1
+
+            # apply minimum image convention
+            v = minimum_image(v ./ system.box) .* system.box
+
+            q₂ = f.charges[j]
+
+            fac = -KE * q₁ * q₂
+            e, ∂e∂v = fac .* ewald_recip_potential(v, recip.alpha)
+
+            forces[i] += ∂e∂v
+            forces[j] -= ∂e∂v
+            e_threads[Threads.threadid()] += e
+        end
+    end
+
+    e_sum = sum(e_threads)
+
+    # k-space
+
+    e_recip = recip(system.box, f.charges, positions, system.forces)
+
+    e_sum += e_recip
+
     return e_sum
 end
 

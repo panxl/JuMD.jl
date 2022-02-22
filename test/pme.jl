@@ -3,8 +3,8 @@ using JuMD: MMSystem, ForceGroups, CoulombForce, PMERecip
 using Test
 
 alpha = 0.8
+nfft = (64, 64, 64)
 spline_order = 8
-gridpoints = (64, 64, 64)
 box = (10.0, 10.0, 10.0)
 cutoff = 3.0
 
@@ -13,7 +13,7 @@ charges = [1.0, -1.0]
 masses = [1.0, 1.0]
 atomic_numbers = [1, 1]
 
-recip = PMERecip(alpha, spline_order, gridpoints, JuMD.KE, 1)
+recip = PMERecip(alpha, nfft, spline_order, JuMD.KE, 1)
 elec = CoulombForce(charges=charges, cutoff=cutoff, recip=recip)
 force_groups = ForceGroups(groups=(elec=elec,))
 system = MMSystem(box, positions, masses, atomic_numbers, force_groups)
