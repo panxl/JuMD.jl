@@ -73,7 +73,7 @@ function update!(nblist::NeighborList, positions, box, rsch, exclusion, cl::Link
 
     fill!(nblist.n, zero(eltype(nblist.n)))
 
-    Threads.@threads for ci in CartesianIndices(cl.head)
+    @batch for ci in CartesianIndices(cl.head)
         i = cl.head[ci]
 
         @inbounds while i != 0

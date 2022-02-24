@@ -42,6 +42,7 @@ function force!(system, f::CoulombForce, cl::NullCellList, recip::NullRecip)
             v = x2 - x1
 
             fac = KE * f.charges[i] * f.charges[j]
+
             e, ∂e∂v = fac .* coulomb_potential(v)
 
             forces[i] += ∂e∂v
@@ -59,11 +60,12 @@ function force!(system, f::CoulombForce, cl::LinkedCellList, recip::NullRecip)
     rcut² = rcut^2
     e_threads = zeros(Threads.nthreads())
 
-    Threads.@threads for ci in CartesianIndices(cl.head)
+    @batch for ci in CartesianIndices(cl.head)
         i = cl.head[ci]
         forces = force(system, Threads.threadid())
+        e_thread = 0.0
 
-        @inbounds while i != 0
+        while i != 0
             # skip to next i-atom if i-atom's charge is zero
             if f.charges[i] == 0.0
                 i = cl.list[i]
@@ -109,6 +111,7 @@ function force!(system, f::CoulombForce, cl::LinkedCellList, recip::NullRecip)
                     end
 
                     fac = KE * f.charges[i] * f.charges[j]
+
                     e, ∂e∂v = fac .* coulomb_potential(v)
 
                     # apply switching function
@@ -119,7 +122,7 @@ function force!(system, f::CoulombForce, cl::LinkedCellList, recip::NullRecip)
 
                     forces[i] += ∂e∂v
                     forces[j] -= ∂e∂v
-                    e_threads[Threads.threadid()] += e
+                    e_thread += e
 
                     # Next j-atom
                     j = cl.list[j]
@@ -129,6 +132,8 @@ function force!(system, f::CoulombForce, cl::LinkedCellList, recip::NullRecip)
             # Next i-atom
             i = cl.list[i]
         end
+
+        e_threads[Threads.threadid()] += e_thread
     end # End loop over all cells
 
     e_sum = sum(e_threads)
@@ -142,11 +147,12 @@ function force!(system, f::CoulombForce, cl::LinkedCellList, recip::AbstractReci
     rcut² = rcut^2
     e_threads = zeros(Threads.nthreads())
 
-    Threads.@threads for ci in CartesianIndices(cl.head)
+    @batch for ci in CartesianIndices(cl.head)
         i = cl.head[ci]
         forces = force(system, Threads.threadid())
+        e_thread = 0.0
 
-        @inbounds while i != 0
+        while i != 0
             # skip to next i-atom if i-atom's charge is zero
             if f.charges[i] == 0.0
                 i = cl.list[i]
@@ -196,7 +202,7 @@ function force!(system, f::CoulombForce, cl::LinkedCellList, recip::AbstractReci
 
                     forces[i] += ∂e∂v
                     forces[j] -= ∂e∂v
-                    e_threads[Threads.threadid()] += e
+                    e_thread += e
 
                     # Next j-atom
                     j = cl.list[j]
@@ -206,6 +212,8 @@ function force!(system, f::CoulombForce, cl::LinkedCellList, recip::AbstractReci
             # Next i-atom
             i = cl.list[i]
         end
+
+        e_threads[Threads.threadid()] += e_thread
     end # End loop over all cells
 
     e_sum = sum(e_threads)
@@ -225,8 +233,9 @@ function force!(system, f::CoulombForce, nbl::NeighborList, recip::AbstractRecip
     rcut² = rcut^2
     e_threads = zeros(Threads.nthreads())
 
-    Threads.@threads for i in 1 : length(positions)
+    @batch for i in 1 : length(positions)
         forces = force(system, Threads.threadid())
+        e_thread = 0.0
 
         # skip to next i-atom if i-atom's charge is zero
         q₁ = f.charges[i]
@@ -240,20 +249,22 @@ function force!(system, f::CoulombForce, nbl::NeighborList, recip::AbstractRecip
         ilist = nbl.list[i]
         @inbounds for j_idx in 1 : nbl.n[i]
             j = ilist[j_idx]
+            q₂ = f.charges[j]
 
             # skip to next j-atom if j-atom's epsilon is zero
-            q₂ = f.charges[j]
             if q₂ == 0.0
                 continue
             end
 
-            # load other j-atom's information
+            # load j-atom's other information
             x2 = positions[j]
 
             v = x2 - x1
 
             # apply minimum image convention
-            v = minimum_image(v ./ system.box) .* system.box
+            if any(system.box .!= 0.0)
+                v = minimum_image(v ./ system.box) .* system.box
+            end
 
             # skip to next j-atom if r > rcut
             r² = v ⋅ v
@@ -262,11 +273,12 @@ function force!(system, f::CoulombForce, nbl::NeighborList, recip::AbstractRecip
             end
 
             fac = KE * q₁ * q₂
+
             e, ∂e∂v = fac .* ewald_real_potential(v, recip.alpha)
 
             forces[i] += ∂e∂v
             forces[j] -= ∂e∂v
-            e_threads[Threads.threadid()] += e
+            e_thread += e
         end
 
         #substract k-space contributions from the unit cell
@@ -279,17 +291,22 @@ function force!(system, f::CoulombForce, nbl::NeighborList, recip::AbstractRecip
             v = x2 - x1
 
             # apply minimum image convention
-            v = minimum_image(v ./ system.box) .* system.box
+            if any(system.box .!= 0.0)
+                v = minimum_image(v ./ system.box) .* system.box
+            end
 
             q₂ = f.charges[j]
 
             fac = -KE * q₁ * q₂
+
             e, ∂e∂v = fac .* ewald_recip_potential(v, recip.alpha)
 
             forces[i] += ∂e∂v
             forces[j] -= ∂e∂v
-            e_threads[Threads.threadid()] += e
+            e_thread += e
         end
+
+        e_threads[Threads.threadid()] += e_thread
     end
 
     e_sum = sum(e_threads)
@@ -326,6 +343,7 @@ function force!(system, f::CoulombExceptionForce)
         end
 
         fac = KE * f.charge_prod[i]
+
         e, ∂e∂v = fac .* coulomb_potential(v)
 
         forces[i1] += ∂e∂v

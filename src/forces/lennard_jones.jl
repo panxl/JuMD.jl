@@ -1,8 +1,7 @@
-
 Base.@kwdef struct LennardJonesForce{C<:Union{Float64, Nothing}} <: AbstractForce
-    sigma::Vector{Float64} = Float64[]
     epsilon::Vector{Float64} = Float64[]
-    exclusion::Vector{Vector{Int}} = [Vector{Int}() for _ in 1 : length(sigma)]
+    sigma::Vector{Float64} = Float64[]
+    exclusion::Vector{Vector{Int}} = [Vector{Int}() for _ in 1 : length(epsilon)]
     cutoff::C = nothing
 end
 
@@ -27,7 +26,7 @@ function force!(system, f::LennardJonesForce, cl::NullCellList)
             continue
         end
 
-        for j in (i + 1 : natoms)
+        for j in (i + 1) : natoms
             # skip to next j-atom if j-atom's epsilon is zero
             if f.epsilon[j] == 0.0
                 continue
@@ -62,11 +61,12 @@ function force!(system, f::LennardJonesForce, cl::LinkedCellList)
     rcut² = rcut^2
     e_threads = zeros(Threads.nthreads())
 
-    Threads.@threads for ci in CartesianIndices(cl.head)
+    @batch for ci in CartesianIndices(cl.head)
         i = cl.head[ci]
         forces = force(system, Threads.threadid())
+        e_thread = 0.0
 
-        @inbounds while i != 0
+        while i != 0
             # skip to next i-atom if i-atom's epsilon is zero
             if f.epsilon[i] == 0.0
                 i = cl.list[i]
@@ -124,16 +124,18 @@ function force!(system, f::LennardJonesForce, cl::LinkedCellList)
 
                     forces[i] += ∂e∂v
                     forces[j] -= ∂e∂v
-                    e_threads[Threads.threadid()] += e
+                    e_thread += e
 
                     # Next j-atom
                     j = cl.list[j]
                 end
             end
 
-             # Next i-atom
+            # Next i-atom
             i = cl.list[i]
         end
+
+        e_threads[Threads.threadid()] += e_thread
     end # End loop over all cells
 
     e_sum = sum(e_threads)
@@ -146,8 +148,9 @@ function force!(system, f::LennardJonesForce, nbl::NeighborList)
     rcut² = rcut^2
     e_threads = zeros(Threads.nthreads())
 
-    Threads.@threads for i in 1 : length(positions)
+    @batch for i in 1 : length(positions)
         forces = force(system, Threads.threadid())
+        e_thread = 0.0
 
         # skip to next i-atom if i-atom's epsilon is zero
         ϵ₁ = f.epsilon[i]
@@ -160,16 +163,16 @@ function force!(system, f::LennardJonesForce, nbl::NeighborList)
         σ₁ = f.sigma[i]
 
         ilist = nbl.list[i]
-        @inbounds for j_idx in 1 : nbl.n[i]
+        for j_idx in 1 : nbl.n[i]
             j = ilist[j_idx]
+            ϵ₂ = f.epsilon[j]
 
             # skip to next j-atom if j-atom's epsilon is zero
-            ϵ₂ = f.epsilon[j]
             if ϵ₂ == 0.0
                 continue
             end
 
-            # load other j-atom's information
+            # load j-atom's other information
             x2 = positions[j]
             σ₂ = f.sigma[j]
 
@@ -199,17 +202,20 @@ function force!(system, f::LennardJonesForce, nbl::NeighborList)
 
             forces[i] += ∂e∂v
             forces[j] -= ∂e∂v
-            e_threads[Threads.threadid()] += e
+            e_thread += e
         end
+
+        e_threads[Threads.threadid()] += e_thread
     end
+
     e_sum = sum(e_threads)
     return e_sum
 end
 
 Base.@kwdef struct LennardJonesExceptionForce <: AbstractForce
     indices::Vector{Tuple{Int, Int}} = []
-    sigma::Vector{Float64} = []
     epsilon::Vector{Float64} = []
+    sigma::Vector{Float64} = []
 end
 
 function force!(system, f::LennardJonesExceptionForce)

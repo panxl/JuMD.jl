@@ -61,8 +61,8 @@ function MMSystem(parm7::AbstractString, rst7::AbstractString; cutoff=nothing)
     vdw = LennardJonesForce(cutoff=cutoff)
     elec = CoulombForce(cutoff=cutoff, recip=recip)
     for (i, atom) in enumerate(parm.atoms)
-        push!(vdw.sigma, atom.sigma / 10.0 / 2)
         push!(vdw.epsilon, 2 * sqrt(atom.epsilon * 4.184))
+        push!(vdw.sigma, atom.sigma / 10.0 / 2)
         push!(elec.charges, atom.charge)
         exclusion = sort(collect(nonbonded_exclusion[i]))
         push!(vdw.exclusion, exclusion)
@@ -78,15 +78,15 @@ function MMSystem(parm7::AbstractString, rst7::AbstractString; cutoff=nothing)
             index2 = dihedral.atom4.idx + 1
             if (index1, index2) ∉ indice_set
                 push!(indice_set, (index1, index2))
-                sigma1 = vdw.sigma[index1]
-                sigma2 = vdw.sigma[index2]
                 epsilon1 = vdw.epsilon[index1]
                 epsilon2 = vdw.epsilon[index2]
-                sigma = sigma1 + sigma2
+                sigma1 = vdw.sigma[index1]
+                sigma2 = vdw.sigma[index2]
                 epsilon = epsilon1 * epsilon2 / dihedral.type.scnb
+                sigma = sigma1 + sigma2
                 push!(vdw14.indices, (index1, index2))
-                push!(vdw14.sigma, sigma)
                 push!(vdw14.epsilon, epsilon)
+                push!(vdw14.sigma, sigma)
 
                 q1 = elec.charges[index1]
                 q2 = elec.charges[index2]

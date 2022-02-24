@@ -1,8 +1,10 @@
 module JuMD
 
 using LinearAlgebra
+using LoopVectorization
 using OffsetArrays
 using PeriodicTable
+using Polyester
 using SpecialFunctions
 using StaticArrays
 using Unitful
