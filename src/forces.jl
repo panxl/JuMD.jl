@@ -402,25 +402,23 @@ function lennard_jones_force(v, σ, ϵ)
     return e, ∂e∂v
 end
 
-Base.@kwdef struct CoulombForce{C<:Union{Float64, Nothing}, E<:Union{<:AbstractRecip, Nothing}} <: AbstractForce
+Base.@kwdef struct CoulombForce{C<:Union{Float64, Nothing}, R<:AbstractRecip} <: AbstractForce
     charges::Vector{Float64} = Float64[]
     exclusion::Vector{Vector{Int}} = [Vector{Int}() for _ in 1 : length(charges)]
     cutoff::C = nothing
-    recip::E = nothing
+    recip::R = NullRecip()
 end
 
 function force!(system, forces::CoulombForce)
     if cell_list(system) isa NullCellList
-        e = force!(system, forces, cell_list(system))
-    elseif isnothing(forces.recip)
-        e = force!(system, forces, neighbor_list(system))
+        e = force!(system, forces, cell_list(system), forces.recip)
     else
         e = force!(system, forces, neighbor_list(system), forces.recip)
     end
     return e
 end
 
-function force!(system, f::CoulombForce, cl::NullCellList)
+function force!(system, f::CoulombForce, cl::NullCellList, recip::NullRecip)
     natoms = length(f.charges)
     positions = position(system)
     forces = force(system)
@@ -458,7 +456,7 @@ function force!(system, f::CoulombForce, cl::NullCellList)
     return e_sum
 end
 
-function force!(system, f::CoulombForce, cl::LinkedCellList)
+function force!(system, f::CoulombForce, cl::LinkedCellList, recip::NullRecip)
     positions = position(system)
     ncells = size(cl.head)
     rcut = f.cutoff

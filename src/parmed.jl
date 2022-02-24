@@ -6,7 +6,7 @@ function MMSystem(parm7::AbstractString, rst7::AbstractString; cutoff=nothing)
 
     if isnothing(parm.box)
         box = [0., 0., 0.]
-        recip = nothing
+        recip = NullRecip()
     elseif parm.box[4:6] != [90., 90., 90.]
         error("Only orthogonal box is supported")
     else

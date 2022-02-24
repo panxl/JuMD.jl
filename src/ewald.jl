@@ -1,5 +1,7 @@
 abstract type AbstractRecip end
 
+struct NullRecip <: AbstractRecip end
+
 struct EwaldRecip{D, N} <: AbstractRecip
     alpha::Float64
     kvectors::Vector{NTuple{D, Int}}
