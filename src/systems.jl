@@ -21,24 +21,6 @@ function MMSystem(box, positions, masses, atomic_numbers, force_groups::ForceGro
     velocities = zero(positions)
     forces = ntuple(i -> zero(positions), N)
 
-    # check cutoff for force groups and set cell list accordingly
-    cutoffs = []
-    for group in force_groups.groups
-        if hasfield(typeof(group), :cutoff) && !isnothing(group.cutoff)
-            push!(cutoffs, group.cutoff)
-        end
-    end
-    if isempty(cutoffs)
-        cell_list = NullCellList()
-        cutoff = nothing
-    elseif all(map(cutoff -> cutoff == first(cutoffs), cutoffs))
-        cutoff = first(cutoffs)
-        cell_list = LinkedCellList(natoms, cutoff, box, ratio=0.5)
-        update!(cell_list, positions, box)
-    else
-        error("Cutoffs have to be the same for all force groups")
-    end
-
     # check exclusion lists for force groups
     exclusions = []
     for group in force_groups.groups
@@ -54,16 +36,30 @@ function MMSystem(box, positions, masses, atomic_numbers, force_groups::ForceGro
         error("Exclusion lists have to be the same for all force groups")
     end
 
+    # check cutoff for force groups and set cell list accordingly
+    rskin = 0.2
+    cutoffs = []
+    for group in force_groups.groups
+        if hasfield(typeof(group), :cutoff) && !isnothing(group.cutoff)
+            push!(cutoffs, group.cutoff)
+        end
+    end
+    if isempty(cutoffs)
+        cell_list = NullCellList()
+        cutoff = nothing
+    elseif all(map(cutoff -> cutoff == first(cutoffs), cutoffs))
+        cutoff = first(cutoffs)
+        rsch = cutoff + rskin
+        cell_list = LinkedCellList(natoms, rsch, box, ratio=0.5)
+        update!(cell_list, positions, box)
+    else
+        error("Cutoffs have to be the same for all force groups")
+    end
+
     # hard code maxnb and rskin for now
     maxnb = 1000
-    rskin = 0.2
-    neighbor_list = NeighborList(natoms, maxnb)
-    if !isnothing(cutoff)
-        rsch = cutoff + rskin
-    else
-        rsch = nothing
-    end
-    update!(neighbor_list, positions, box, rsch, exclusion, cell_list)
+    neighbor_list = NeighborList(natoms, maxnb, rskin=rskin)
+    update!(neighbor_list, positions, box, cutoff, exclusion, cell_list)
 
     D = length(eltype(positions))
     C = typeof(cell_list)

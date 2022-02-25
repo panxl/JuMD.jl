@@ -12,20 +12,21 @@ struct LinkedCellList{D} <: AbstractCellList
 end
 
 function LinkedCellList(natoms, rsch, box; ratio=1.0)
-    D = length(box)
-    cells = Vector{CartesianIndex{D}}(undef, natoms)
+    ndim = length(box)
+    cells = Vector{CartesianIndex{ndim}}(undef, natoms)
     list = Vector{Int}(undef, natoms)
-    cellsize = rsch * ratio
-    ncells = map(b -> floor(Int, b / cellsize), Tuple(box))
-    nmax = ceil(Int, 1 / ratio)
+    ncells = map(b -> floor(Int, b / (rsch * ratio)), Tuple(box))
+    ncells = floor.(Int, ncells ./ 2) .* 2
+    cellsize = box ./ ncells
+    nmax = ceil.(Int, rsch ./ cellsize)
 
-    if any(ncells .< 2 * nmax + 1)
+    if any(ncells .< 2 .* nmax .+ 1)
         error("Box is too small for the cutoff")
     end
 
-    head = OffsetArray(zeros(Int, ncells), CartesianIndex(ntuple(i -> 0, D)...):CartesianIndex((ncells .- 1)...))
-    offsets = CartesianIndices((fill(-nmax : nmax, D)...,))[1 : ((2 * nmax + 1)^D + 1) ÷ 2]
-    offsets = filter(offset -> norm(Tuple(offset) .- sign.(Tuple(offset))) < 1 / ratio, offsets)
+    head = OffsetArray(zeros(Int, ncells), CartesianIndex(ntuple(i -> 0, ndim)...):CartesianIndex((ncells .- 1)...))
+    offsets = CartesianIndices(Tuple(fill(-n : n)[] for n in nmax))[1 : (prod(2 .* nmax .+ 1) + 1) ÷ 2]
+    offsets = filter(offset -> norm((Tuple(offset) .- sign.(Tuple(offset))) .* cellsize) < rsch, offsets)
     LinkedCellList(cells, list, head, offsets)
 end
 
@@ -59,24 +60,28 @@ minimum_image(r_box) = r_box .- round.(r_box)
 struct NeighborList
     list::Vector{Vector{Int}}
     n::Vector{Int}
+    rskin::Float64
 end
 
-function NeighborList(natoms::Int, maxnb::Int)
+function NeighborList(natoms::Int, maxnb::Int; rskin=0.0)
     list = [zeros(Int, maxnb) for _ in 1 : natoms]
     n = zeros(Int, natoms)
-    NeighborList(list, n)
+    NeighborList(list, n, rskin)
 end
 
-function update!(nblist::NeighborList, positions, box, rsch, exclusion, cl::LinkedCellList)
+function update!(nblist::NeighborList, positions, box, rcut, exclusion, cl::LinkedCellList)
     ncells = size(cl.head)
+    rsch = rcut + nblist.rskin
     rsch² = rsch^2
+    rcut² = rcut^2
 
+    # empty the current neighbor list
     fill!(nblist.n, zero(eltype(nblist.n)))
 
     @batch for ci in CartesianIndices(cl.head)
         i = cl.head[ci]
 
-        @inbounds while i != 0
+        while i != 0
             x1 = positions[i]
 
             for offset in cl.offsets
@@ -103,13 +108,14 @@ function update!(nblist::NeighborList, positions, box, rsch, exclusion, cl::Link
                         v = minimum_image(v ./ box) .* box
                     end
 
-                    # skip to next j-atom if r > rcut
+                    # skip to next j-atom if r > rsch
                     r² = v ⋅ v
                     if r² > rsch²
                         j = cl.list[j]
                         continue
                     end
 
+                    # add j-atom to i-atom's neighbor list
                     nblist.n[i] += 1
                     nblist.list[i][nblist.n[i]] = j
 
@@ -117,9 +123,6 @@ function update!(nblist::NeighborList, positions, box, rsch, exclusion, cl::Link
                     j = cl.list[j]
                 end
             end
-
-            # # sort i-atom's neighbors
-            # sort!(view(nblist.list[i], 1 : nblist.n[i]))
 
             # Next i-atom
             i = cl.list[i]
