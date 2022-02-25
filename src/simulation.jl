@@ -32,6 +32,7 @@ function minimize!(system, steps, stepsize=0.001)
         force!(system)
         for i in eachindex(positions, forces)
             positions[i] += stepsize * clamp.(forces[i], -1, 1)
+            update!(system.soa, positions)
         end
     end
 end

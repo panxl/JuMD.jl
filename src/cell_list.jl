@@ -58,25 +58,26 @@ wrap_positions(r_box) = r_box .- floor.(r_box)
 minimum_image(r_box) = r_box .- round.(r_box)
 
 struct NeighborList
-    list::Vector{Vector{Int}}
-    n::Vector{Int}
+    n_neighbors::Vector{Int}
+    lists::Vector{Vector{Int}}
     rskin::Float64
 end
 
 function NeighborList(natoms::Int, maxnb::Int; rskin=0.0)
-    list = [zeros(Int, maxnb) for _ in 1 : natoms]
-    n = zeros(Int, natoms)
-    NeighborList(list, n, rskin)
+    n_neighbors = zeros(Int, natoms)
+    lists = [zeros(Int, maxnb) for _ in 1 : natoms]
+    NeighborList(n_neighbors, lists, rskin)
 end
 
-function update!(nblist::NeighborList, positions, box, rcut, exclusion, cl::LinkedCellList)
+function update!(nbl::NeighborList, positions, box, rcut, exclusion, cl::LinkedCellList)
+    @unpack n_neighbors, lists, rskin = nbl
+
     ncells = size(cl.head)
-    rsch = rcut + nblist.rskin
+    rsch = rcut + rskin
     rsch² = rsch^2
-    rcut² = rcut^2
 
     # empty the current neighbor list
-    fill!(nblist.n, zero(eltype(nblist.n)))
+    fill!(n_neighbors, zero(eltype(n_neighbors)))
 
     @batch for ci in CartesianIndices(cl.head)
         i = cl.head[ci]
@@ -116,8 +117,8 @@ function update!(nblist::NeighborList, positions, box, rcut, exclusion, cl::Link
                     end
 
                     # add j-atom to i-atom's neighbor list
-                    nblist.n[i] += 1
-                    nblist.list[i][nblist.n[i]] = j
+                    n_neighbors[i] += 1
+                    lists[i][n_neighbors[i]] = j
 
                     # Next j-atom
                     j = cl.list[j]
@@ -128,13 +129,15 @@ function update!(nblist::NeighborList, positions, box, rcut, exclusion, cl::Link
             i = cl.list[i]
         end
     end # End loop over all cells
-    return nblist
+    return nbl
 end
 
-function update!(nblist::NeighborList, positions, box, rsch, exclusion, cl::NullCellList)
+function update!(nbl::NeighborList, positions, box, rsch, exclusion, cl::NullCellList)
+    @unpack n_neighbors, lists = nbl
     natoms = length(positions)
 
-    fill!(nblist.n, zero(eltype(nblist.n)))
+    # empty the current neighbor list
+    fill!(n_neighbors, zero(eltype(n_neighbors)))
 
     for i in 1 : (natoms - 1)
         x1 = positions[i]
@@ -161,9 +164,9 @@ function update!(nblist::NeighborList, positions, box, rsch, exclusion, cl::Null
                 end
             end
 
-            nblist.n[i] += 1
-            nblist.list[i][nblist.n[i]] = j
+            n_neighbors[i] += 1
+            lists[i][n_neighbors[i]] = j
         end
     end
-    return nblist
+    return nbl
 end

@@ -1,5 +1,30 @@
 abstract type AbstractSystem end
 
+struct SoASystem
+    x::Vector{Float64}
+    y::Vector{Float64}
+    z::Vector{Float64}
+    fx::Vector{Float64}
+    fy::Vector{Float64}
+    fz::Vector{Float64}
+end
+
+function SoASystem(natoms)
+    x = zeros(Float64, natoms)
+    y = zeros(Float64, natoms)
+    z = zeros(Float64, natoms)
+    fx = zeros(Float64, natoms)
+    fy = zeros(Float64, natoms)
+    fz = zeros(Float64, natoms)
+    SoASystem(x, y, z, fx, fy, fz)
+end
+
+function update!(soa::SoASystem, positions)
+    @batch for i in eachindex(positions)
+        soa.x[i], soa.y[i], soa.z[i] = positions[i]
+    end
+end
+
 struct MMSystem{D, N, C, K, V} <: AbstractSystem
     box::SVector{D, Float64}
     positions::Vector{SVector{D, Float64}}
@@ -10,6 +35,7 @@ struct MMSystem{D, N, C, K, V} <: AbstractSystem
     force_groups::ForceGroups{K, V}
     cell_list::C
     neighbor_list::NeighborList
+    soa::SoASystem
     scache::Cache{Float64}
     vcache::Cache{SVector{D, Float64}}
 end
@@ -61,10 +87,15 @@ function MMSystem(box, positions, masses, atomic_numbers, force_groups::ForceGro
     neighbor_list = NeighborList(natoms, maxnb, rskin=rskin)
     update!(neighbor_list, positions, box, cutoff, exclusion, cell_list)
 
+    soa = SoASystem(natoms)
+
+    # update positions
+    update!(soa, positions)
+
     D = length(eltype(positions))
     C = typeof(cell_list)
 
-    MMSystem{D, N, C, K, V}(box, positions, velocities, forces, masses, atomic_numbers, force_groups, cell_list, neighbor_list, Cache(Float64), Cache(SVector{D, Float64}))
+    MMSystem{D, N, C, K, V}(box, positions, velocities, forces, masses, atomic_numbers, force_groups, cell_list, neighbor_list, soa, Cache(Float64), Cache(SVector{D, Float64}))
 end
 
 bounding_box(s::AbstractSystem)  = s.box

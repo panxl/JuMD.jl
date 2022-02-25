@@ -7,6 +7,7 @@ using PeriodicTable
 using Polyester
 using SpecialFunctions
 using StaticArrays
+using UnPack
 using Unitful
 
 include("constants.jl")
