@@ -283,12 +283,6 @@ function force!(system, f::CoulombForce, nbl::NeighborList, recip::AbstractRecip
 
             e, ∂e∂v = fac .* ewald_real_potential(v, recip.alpha)
 
-            # apply switching function
-            r = sqrt(r²)
-            s, dsdr = shift(r, rcut)
-            ∂e∂v = ∂e∂v .* s + e * dsdr / r * v
-            e *= s
-
             # accumulate
             e_thread += e
             f_thread += ∂e∂v
@@ -400,14 +394,6 @@ function force!(system, f::CoulombForce, nbl::NeighborList, recip::AbstractRecip
             ∂e∂x *= mask
             ∂e∂y *= mask
             ∂e∂z *= mask
-
-            # apply switching function
-            r = sqrt(r²)
-            s, dsdr = shift(r, rcut)
-            ∂e∂x = (∂e∂x * s) + (e * dsdr * vx / r)
-            ∂e∂y = (∂e∂y * s) + (e * dsdr * vy / r)
-            ∂e∂z = (∂e∂z * s) + (e * dsdr * vz / r)
-            e *= s
 
             # accumulate
             e_thread += e
