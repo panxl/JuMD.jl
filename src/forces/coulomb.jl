@@ -114,12 +114,6 @@ function force!(system, f::CoulombForce, cl::LinkedCellList, recip::NullRecip)
 
                     e, ∂e∂v = fac .* coulomb_potential(v)
 
-                    # apply switching function
-                    r = sqrt(r²)
-                    s, dsdr = shift(r, rcut)
-                    ∂e∂v = ∂e∂v .* s + e * dsdr / r * v
-                    e *= s
-
                     forces[i] += ∂e∂v
                     forces[j] -= ∂e∂v
                     e_thread += e
@@ -339,7 +333,7 @@ function force!(system, f::CoulombForce, nbl::NeighborList, recip::AbstractRecip
 
     e_threads = zeros(Threads.nthreads())
 
-    for i in 1 : length(system.positions)
+    @batch for i in 1 : length(system.positions)
         q₁ = f.charges[i]
 
         # skip to next i-atom if i-atom's charge is zero

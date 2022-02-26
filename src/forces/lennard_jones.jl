@@ -116,12 +116,6 @@ function force!(system, f::LennardJonesForce, cl::LinkedCellList)
 
                     e, ∂e∂v = lennard_jones_force(v, σ, ϵ)
 
-                    # apply switching function
-                    r = sqrt(r²)
-                    s, dsdr = shift(r, rcut)
-                    ∂e∂v = ∂e∂v .* s + e * dsdr / r * v
-                    e *= s
-
                     forces[i] += ∂e∂v
                     forces[j] -= ∂e∂v
                     e_thread += e
@@ -201,12 +195,6 @@ function force!(system, f::LennardJonesForce, nbl::NeighborList)
 
             e, ∂e∂v = lennard_jones_force(v, σ, ϵ)
 
-            # apply switching function
-            r = sqrt(r²)
-            s, dsdr = shift(r, rcut)
-            ∂e∂v = ∂e∂v .* s + e * dsdr / r * v
-            e *= s
-
             # accumulate
             e_thread += e
             f_thread += ∂e∂v
@@ -230,7 +218,7 @@ function force!(system, f::LennardJonesForce, nbl::NeighborList, soa)
 
     e_threads = zeros(Threads.nthreads())
 
-    for i in 1 : length(system.positions)
+    @batch for i in 1 : length(system.positions)
         ϵ₁ = f.epsilon[i]
 
         # skip to next i-atom if i-atom's epsilon is zero
@@ -283,14 +271,6 @@ function force!(system, f::LennardJonesForce, nbl::NeighborList, soa)
             ∂e∂x *= mask
             ∂e∂y *= mask
             ∂e∂z *= mask
-
-            # apply switching function
-            r = sqrt(r²)
-            s, dsdr = shift(r, rcut)
-            ∂e∂x = (∂e∂x * s) + (e * dsdr * vx / r)
-            ∂e∂y = (∂e∂y * s) + (e * dsdr * vy / r)
-            ∂e∂z = (∂e∂z * s) + (e * dsdr * vz / r)
-            e *= s
 
             # accumulate
             e_thread += e
