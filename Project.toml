@@ -18,6 +18,7 @@ Unitful = "1986cc42-f94f-5a68-af5c-568840ba703d"
 helpme_jll = "f33c8c47-f3e6-5e52-bf5f-5eacb4024144"
 
 [compat]
+UnPack = "1"
 julia = "1.7"
 
 [extras]
