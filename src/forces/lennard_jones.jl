@@ -219,6 +219,10 @@ function force!(system, f::LennardJonesForce, nbl::NeighborList, soa)
     e_threads = zeros(Threads.nthreads())
 
     @batch for i in 1 : length(system.positions)
+        fx_thread = fx[Threads.threadid()]
+        fy_thread = fy[Threads.threadid()]
+        fz_thread = fz[Threads.threadid()]
+
         ϵ₁ = f.epsilon[i]
 
         # skip to next i-atom if i-atom's epsilon is zero
@@ -233,7 +237,7 @@ function force!(system, f::LennardJonesForce, nbl::NeighborList, soa)
         σ₁ = f.sigma[i]
 
         # accumulator for i-atom
-        e_thread = fx_thread = fy_thread = fz_thread = 0.0
+        e_thread = fxᵢ = fyᵢ = fzᵢ = 0.0
 
         list = lists[i]
         n = n_neighbors[i]
@@ -274,31 +278,37 @@ function force!(system, f::LennardJonesForce, nbl::NeighborList, soa)
 
             # accumulate
             e_thread += e
-            fx_thread += ∂e∂x
-            fy_thread += ∂e∂y
-            fz_thread += ∂e∂z
-            fx[j] -= ∂e∂x
-            fy[j] -= ∂e∂y
-            fz[j] -= ∂e∂z
+            fxᵢ += ∂e∂x
+            fyᵢ += ∂e∂y
+            fzᵢ += ∂e∂z
+            fx_thread[j] -= ∂e∂x
+            fy_thread[j] -= ∂e∂y
+            fz_thread[j] -= ∂e∂z
         end
 
         # accumulate
-        fx[i] += fx_thread
-        fy[i] += fy_thread
-        fz[i] += fz_thread
+        fx_thread[i] += fxᵢ
+        fy_thread[i] += fyᵢ
+        fz_thread[i] += fzᵢ
         e_threads[Threads.threadid()] += e_thread
     end
 
     e_sum = sum(e_threads)
 
     # update forces
-    forces = force(system)
-    @batch for i in eachindex(forces)
-        forces[i] += SVector(fx[i], fy[i], fz[i])
+    @batch per=thread for _ in 1 : Threads.nthreads()
+        forces = force(system, Threads.threadid())
+        fx_thread = fx[Threads.threadid()]
+        fy_thread = fy[Threads.threadid()]
+        fz_thread = fz[Threads.threadid()]
+
+        for i in 1 : length(system.positions)
+            forces[i] += SVector(fx_thread[i], fy_thread[i], fz_thread[i])
+            fx_thread[i] = zero(eltype(fx_thread))
+            fy_thread[i] = zero(eltype(fy_thread))
+            fz_thread[i] = zero(eltype(fz_thread))
+        end
     end
-    fill!(system.soa.fx, zero(eltype(system.soa.fx)))
-    fill!(system.soa.fy, zero(eltype(system.soa.fy)))
-    fill!(system.soa.fz, zero(eltype(system.soa.fz)))
 
     return e_sum
 end

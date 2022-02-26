@@ -1,21 +1,22 @@
 abstract type AbstractSystem end
 
-struct SoASystem
+struct SoASystem{N}
     x::Vector{Float64}
     y::Vector{Float64}
     z::Vector{Float64}
-    fx::Vector{Float64}
-    fy::Vector{Float64}
-    fz::Vector{Float64}
+    fx::NTuple{N, Vector{Float64}}
+    fy::NTuple{N, Vector{Float64}}
+    fz::NTuple{N, Vector{Float64}}
 end
 
 function SoASystem(natoms)
+    N = Threads.nthreads()
     x = zeros(Float64, natoms)
     y = zeros(Float64, natoms)
     z = zeros(Float64, natoms)
-    fx = zeros(Float64, natoms)
-    fy = zeros(Float64, natoms)
-    fz = zeros(Float64, natoms)
+    fx = ntuple(i -> zeros(natoms), N)
+    fy = ntuple(i -> zeros(natoms), N)
+    fz = ntuple(i -> zeros(natoms), N)
     SoASystem(x, y, z, fx, fy, fz)
 end
 
@@ -35,7 +36,7 @@ struct MMSystem{D, N, C, K, V} <: AbstractSystem
     force_groups::ForceGroups{K, V}
     cell_list::C
     neighbor_list::NeighborList
-    soa::SoASystem
+    soa::SoASystem{N}
     scache::Cache{Float64}
     vcache::Cache{SVector{D, Float64}}
 end

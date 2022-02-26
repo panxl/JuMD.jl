@@ -13,13 +13,13 @@ Base.Base.@kwdef struct ForceGroups{K, V}
 end
 
 function force!(system, force_groups::ForceGroups)
-    for i in 1:Threads.nthreads()
+    for i in 1 : Threads.nthreads()
         forces = force(system, i)
         fill!(forces, zeros(eltype(forces)))
     end
     update!(cell_list(system), position(system), bounding_box(system))
     force_groups.energies .= map(f -> force!(system, f), values(force_groups.groups))
-    for i in 2:Threads.nthreads()
+    for i in 2 : Threads.nthreads()
         forces = force(system, i)
         force(system) .+= forces
         fill!(forces, zeros(eltype(forces)))
