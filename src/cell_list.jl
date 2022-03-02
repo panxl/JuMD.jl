@@ -61,15 +61,45 @@ struct NeighborList
     n_neighbors::Vector{Int}
     lists::Vector{Vector{Int}}
     rskin::Float64
+    x0::Vector{Float64}
+    y0::Vector{Float64}
+    z0::Vector{Float64}
 end
 
 function NeighborList(natoms::Int, maxnb::Int; rskin=0.0)
     n_neighbors = zeros(Int, natoms)
     lists = [zeros(Int, maxnb) for _ in 1 : natoms]
-    NeighborList(n_neighbors, lists, rskin)
+    x0 = zeros(Float64, natoms)
+    y0 = zeros(Float64, natoms)
+    z0 = zeros(Float64, natoms)
+    NeighborList(n_neighbors, lists, rskin, x0, y0, z0)
 end
 
-function update!(nbl::NeighborList, positions, box, rcut, exclusion, cl::LinkedCellList)
+function update!(nbl::NeighborList, positions, box, rcut, exclusion, x, y, z, cl::LinkedCellList)
+    # check if update is needed
+    threshold = (0.5 * nbl.rskin)^2
+    @unpack x0, y0, z0 = nbl
+    n = 0
+    @tturbo for i in eachindex(x, y, z, x0, y0, z0)
+        d² = (x[i] - x0[i])^2 + (y[i] - y0[i])^2 + (z[i] - z0[i])^2
+        n += d² > threshold
+    end
+
+    # skip updating neighbor list because it is not needed
+    if n == 0
+        return nbl
+    end
+
+    # update saved positions
+    @tturbo for i in eachindex(x, y, z, x0, y0, z0)
+        x0[i] = x[i]
+        y0[i] = y[i]
+        z0[i] = z[i]
+    end
+
+    # now we are updating cell list and neighbor list
+    update!(cl, positions, box)
+
     @unpack n_neighbors, lists, rskin = nbl
 
     ncells = size(cl.head)

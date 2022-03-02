@@ -83,15 +83,15 @@ function MMSystem(box, positions, masses, atomic_numbers, force_groups::ForceGro
         error("Cutoffs have to be the same for all force groups")
     end
 
+    soa = SoASystem(natoms)
+
+    # update soa positions
+    update!(soa, positions)
+
     # hard code maxnb and rskin for now
     maxnb = 1000
     neighbor_list = NeighborList(natoms, maxnb, rskin=rskin)
-    update!(neighbor_list, positions, box, cutoff, exclusion, cell_list)
-
-    soa = SoASystem(natoms)
-
-    # update positions
-    update!(soa, positions)
+    update!(neighbor_list, positions, box, cutoff, exclusion, soa.x, soa.y, soa.z, cell_list)
 
     D = length(eltype(positions))
     C = typeof(cell_list)

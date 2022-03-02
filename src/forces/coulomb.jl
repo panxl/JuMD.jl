@@ -331,6 +331,8 @@ function force!(system, f::CoulombForce, nbl::NeighborList, recip::AbstractRecip
     @unpack n_neighbors, lists = nbl
     @unpack x, y, z, fx, fy, fz = soa
 
+    update!(nbl, position(system), bounding_box(system), rcut, f.exclusion, x, y, z, cell_list(system))
+
     e_threads = zeros(Threads.nthreads())
 
     @batch for i in 1 : length(system.positions)
