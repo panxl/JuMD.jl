@@ -9,6 +9,7 @@ alpha = 0.8
 kmax = 11
 
 positions = [(0.5, 0.0, 0.0), (-0.5, 0.0, 0.0)]
+velocities = [(0.0, 0.0, 0.0), (0.0, 0.0, 0.0)]
 charges = [1.0, -1.0]
 masses = [1.0, 1.0]
 atomic_numbers = [1, 1]
@@ -16,7 +17,7 @@ atomic_numbers = [1, 1]
 recip = EwaldRecip(alpha, natoms, kmax, box)
 elec = CoulombForce(charges=charges, cutoff=cutoff, recip=recip)
 force_groups = ForceGroups(groups=(elec=elec,))
-system = MMSystem(box, positions, masses, atomic_numbers, force_groups)
+system = MMSystem(box, positions, velocities, masses, atomic_numbers, force_groups)
 JuMD.force!(system)
 
 e = (system.force_groups.energies / JuMD.KE)[1]

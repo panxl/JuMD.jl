@@ -14,7 +14,14 @@ function MMSystem(parm7::AbstractString, rst7::AbstractString; cutoff=nothing)
         recip = PMERecip(box, cutoff, scaling=JuMD.KE, nthreads=Threads.nthreads())
     end
 
-    positions = [(x._value ./ 10.0) for x in parm.positions]
+    positions = [SVector(x._value ./ 10.0) for x in parm.positions]
+
+    if isnothing(parm.velocities)
+        velocities = zero(positions)
+    else
+        velocities = reinterpret(SVector{3, Float64}, vec(permutedims(parm.velocities)) ./ 10.0)
+    end
+
     masses = [atom.mass for atom in parm.atoms]
     atomic_numbers = [atom.atomic_number for atom in parm.atoms]
     nonbonded_exclusion = [Set{Int}() for _ in parm.atoms]
@@ -99,5 +106,5 @@ function MMSystem(parm7::AbstractString, rst7::AbstractString; cutoff=nothing)
 
     force_groups = ForceGroups(groups=(bonds=bonds, angles=angles, dihedrals=dihedrals, vdw=vdw, vdw14=vdw14, elec=elec, elec14=elec14))
 
-    MMSystem(box, positions, masses, atomic_numbers, force_groups)
+    MMSystem(box, positions, velocities, masses, atomic_numbers, force_groups)
 end

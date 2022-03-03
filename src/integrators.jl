@@ -2,8 +2,8 @@ abstract type AbstractIntegrator end
 
 Base.Base.@kwdef struct VerlocityVerletIntegrator{T, C} <: AbstractIntegrator
     dt::Float64
-    thermostat::T = NullThermostat
-    constraint::C = NullConstraint
+    thermostat::T = NullThermostat()
+    constraint::C = NullConstraint()
 end
 
 function (integrator::VerlocityVerletIntegrator)(system)
@@ -37,5 +37,8 @@ function (integrator::VerlocityVerletIntegrator)(system)
 
     @. v = v + F * inv_M * halfdt
     integrator.constraint(system)
+
+    update!(system.soa, x)
+
     return nothing
 end

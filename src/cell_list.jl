@@ -162,7 +162,7 @@ function update!(nbl::NeighborList, positions, box, rcut, exclusion, x, y, z, cl
     return nbl
 end
 
-function update!(nbl::NeighborList, positions, box, rsch, exclusion, cl::NullCellList)
+function update!(nbl::NeighborList, positions, box, rsch, exclusion, x, y, z, cl::NullCellList)
     @unpack n_neighbors, lists = nbl
     natoms = length(positions)
 

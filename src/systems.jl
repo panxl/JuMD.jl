@@ -41,11 +41,11 @@ struct MMSystem{D, N, C, K, V} <: AbstractSystem
     vcache::Cache{SVector{D, Float64}}
 end
 
-function MMSystem(box, positions, masses, atomic_numbers, force_groups::ForceGroups{K,V}) where {K, V}
+function MMSystem(box, positions, velocities, masses, atomic_numbers, force_groups::ForceGroups{K,V}) where {K, V}
     N = Threads.nthreads()
     natoms = length(positions)
     positions = SVector.(positions)
-    velocities = zero(positions)
+    velocities = SVector.(velocities)
     forces = ntuple(i -> zero(positions), N)
 
     # check exclusion lists for force groups
