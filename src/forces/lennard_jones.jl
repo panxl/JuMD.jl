@@ -141,6 +141,9 @@ function force!(system, f::LennardJonesForce, nbl::NeighborList)
     rcut = f.cutoff
     rcut² = rcut^2
     @unpack n_neighbors, lists = nbl
+    @unpack x, y, z, fx, fy, fz = system.soa
+
+    update!(nbl, position(system), bounding_box(system), rcut, f.exclusion, x, y, z, cell_list(system))
 
     e_threads = zeros(Threads.nthreads())
 

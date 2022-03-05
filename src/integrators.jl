@@ -23,6 +23,7 @@ function (integrator::VerlocityVerletIntegrator)(system)
     integrator.thermostat(system, integrator.dt)
     @. x = x + v * halfdt
     integrator.constraint(system)
+    update!(system.soa, x)
     force!(system)
     integrator.constraint(system)
 
@@ -37,8 +38,6 @@ function (integrator::VerlocityVerletIntegrator)(system)
 
     @. v = v + F * inv_M * halfdt
     integrator.constraint(system)
-
-    update!(system.soa, x)
 
     return nothing
 end
